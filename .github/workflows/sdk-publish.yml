@@ -28,20 +28,12 @@ jobs:
         
     - name: Install dependencies
       run: |
-        cd ./backend/app_sdk
         python -m pip install --upgrade pip
         pip install build
         
     - name: Build package
       run: |
-        cd ./backend/app_sdk
         python -m build
-
-    - name: Move build artifacts
-      run: |
-        ls -alh
-        ls -alh ./backend/app_sdk
-        mv ./backend/app_sdk/dist ./dist
 
     - name: Publish package
       uses: pypa/gh-action-pypi-publish@v1.10.2
