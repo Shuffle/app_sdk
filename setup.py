@@ -4,6 +4,7 @@ setup(
     name='shuffle_sdk',  # Name of the package
     version='0.0.1',  # Version number
     description='The SDK used for Shuffle',  
+    py_modules=["shuffle_sdk"],  # Name of the module
     long_description=open('README.md').read(),  
     long_description_content_type='text/markdown',  
     author='Fredrik Saito Odegaardstuen',  
