@@ -1,10 +1,11 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='shuffle_sdk',  # Name of the package
+    name='shuffle_sdk',  
     version='0.0.2',  
     description='The SDK used for Shuffle',  
-    py_modules=["shuffle_sdk"],  # Name of the module
+    py_modules=["shuffle_sdk"],  
+    license='MIT',
     long_description=open('README.md').read(),  
     long_description_content_type='text/markdown',  
     author='Fredrik Saito Odegaardstuen',  
