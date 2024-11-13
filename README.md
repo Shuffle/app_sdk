@@ -1,22 +1,31 @@
-# app_sdk.py
+# Shuffle SDK
 This is the SDK used for apps to behave like they should. 
 
-## If you want to update apps.. PS: downloads from docker hub do overrides.. :)
-1. Write your code & check if runtime works
-2. Build app_base image
-3. docker rm $(docker ps -aq) # Remove all stopped containers
-4. Delete the specific app's Docker image (docker rmi frikky/shuffle:...)
-5. Rebuild the Docker image (click load in GUI?)
+## Usage
+Refer to the [Shuffle App Creation docs](https://shuffler.io/docs/app_creation)
 
-## Cloud updates
-1. Go to shuffle cloud on GCP
-2. Go to Cloud Storage
-3. Find shuffler.appspot.com
-4. Navigate to generated_apps/baseline
-5. Update SDK there. This will make all new apps run with the new SDK
+**It is NOT meant to be used standalone with python scripts _yet_. This is a coming feature. **
 
-## Cloud app force-updates
-1. Run the "stitcher.go" program in the public shuffle-shared repository.
+## Build
+`docker build . -t shuffle/shuffle:app_sdk`
 
-# LICENSE 
-Everything in here is MIT, not AGPLv3 as indicated by the license.
+## Download
+```
+pip install shuffle_sdk
+```
+
+## Usage
+```
+import shuffle_sdk
+```
+
+## Adding new [Liquid filters](https://shuffler.io/docs/liquid)
+Add a function along these lines:
+```
+@shuffle_filters.register
+def md5(a):
+    a = str(a)
+    return hashlib.md5(a.encode('utf-8')).hexdigest()
+```
+
+This can be used as `{{ "string" | md5 }}`, where `"string"` -> the `a` parameter of the function
