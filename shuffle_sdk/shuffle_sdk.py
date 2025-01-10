@@ -997,7 +997,7 @@ class AppBase:
         #self.action = action
 
         loopnames = []
-        self.logger.info(f"Baseparams to check: {baseparams}")
+        #self.logger.info(f"Baseparams to check: {baseparams}")
         for key, value in baseparams.items():
             check_value = ""
             for param in self.original_action["parameters"]:
@@ -1008,7 +1008,7 @@ class AppBase:
                 octothorpe_count = param["value"].count(".#")
                 if octothorpe_count > self.result_wrapper_count:
                     self.result_wrapper_count = octothorpe_count
-                    self.logger.info("[INFO] NEW OCTOTHORPE WRAPPER: %d" % octothorpe_count)
+                    #self.logger.info("[INFO] NEW OCTOTHORPE WRAPPER: %d" % octothorpe_count)
 
 
             # This whole thing is hard.
@@ -1108,7 +1108,7 @@ class AppBase:
 
         #elif len(listitems) == 1:
         elif len(listlengths) == 1:
-            self.logger.info("All subitems are the same length")
+            #self.logger.info("All subitems are the same length")
 
             for item in listitems:
                 # This loops should always be length 1
@@ -1170,13 +1170,13 @@ class AppBase:
     # Runs recursed versions with inner loops and such 
     #async def run_recursed_items(self, func, baseparams, loop_wrapper):
     def run_recursed_items(self, func, baseparams, loop_wrapper):
-        self.logger.info(f"PRE RECURSED ITEMS: {baseparams}")
+        #self.logger.info(f"PRE RECURSED ITEMS: {baseparams}")
         has_loop = False
 
         newparams = {}
         for key, value in baseparams.items():
             if isinstance(value, list) and len(value) > 0:
-                self.logger.info(f"[DEBUG] In list check for {key}")
+                #self.logger.info(f"[DEBUG] In list check for {key}")
 
                 for value_index in range(len(value)):
                     try:
@@ -1213,8 +1213,7 @@ class AppBase:
             #ret = await self.run_recursed_items(func, newparams, loop_wrapper)
             ret = self.run_recursed_items(func, newparams, loop_wrapper)
         else:
-            self.logger.info(f"[DEBUG] Should run multiplier check with params (inner): {newparams}")
-            #self.logger.info(f"[DEBUG] Should run multiplier check with params (inner)")
+            #self.logger.info(f"[DEBUG] Should run multiplier check with params (inner): {newparams}")
 
             # 1. Find the loops that are required and create new multipliers
             # If here: check for multipliers within this scope.
@@ -1351,7 +1350,7 @@ class AppBase:
                 #else:
                 ret.append(new_value)
 
-            self.logger.info("[INFO] Function return length: %d" % len(ret))
+            #self.logger.info("[INFO] Function return length: %d" % len(ret))
             if len(ret) == 1:
                 #ret = ret[0]
                 self.logger.info("[DEBUG] DONT make list of 1 into 0!!")
@@ -2638,7 +2637,7 @@ class AppBase:
                             for variable in execution_data["workflow"]["workflow_variables"]:
                                 variablename = variable["name"].replace(" ", "_", -1).lower()
         
-                                if variablename.lower() == actionname_lower:
+                                if variablename == actionname_lower:
                                     baseresult = variable["value"]
                                     break
 
@@ -3945,7 +3944,6 @@ class AppBase:
                             # 2. Find the right value from the parsed multi_params
 
                             #self.logger.info("[INFO] Running WITH loop. MULTI: %s", multi_parameters)
-                            self.logger.info("[INFO] Running WITH loop")
                             json_object = False
                             #results = await self.run_recursed_items(func, multi_parameters, {})
                             results = self.run_recursed_items(func, multi_parameters, {})
