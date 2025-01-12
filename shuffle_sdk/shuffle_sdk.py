@@ -1,6 +1,7 @@
 import os
-import ast
 import sys
+import builtins
+import ast
 import re
 import copy
 import time 
@@ -1225,7 +1226,7 @@ class AppBase:
             # FIXME: This does a deduplication of the data
             new_params = self.validate_unique_fields(param_multiplier)
             if len(new_params) == 0:
-                self.logger.info("[WARNING] SHOULD STOP MULTI-EXECUTION BECAUSE FIELDS AREN'T UNIQUE")
+                self.logger.info("[ERROR] SHOULD STOP MULTI-EXECUTION BECAUSE FIELDS AREN'T UNIQUE")
                 self.action_result = {
                     "action": self.action,
                     "authorization": self.authorization,
@@ -1238,7 +1239,7 @@ class AppBase:
 
                 self.send_result(self.action_result, {"Content-Type": "application/json", "Authorization": "Bearer %s" % self.authorization}, "/api/v1/streams")
                 if runtime != "run":
-                    exit()
+                    os.exit()
                 else:
                     return
             else:
