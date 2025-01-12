@@ -1,5 +1,7 @@
-#FROM python:3.9.1-alpine as base
 FROM python:3.10.0-alpine as base
+
+# >3.10 has optimizations that break shared memory of variables
+# IF you are updating the version of Python, it will need EXTENSIVE testing
 #FROM python:3.11.3-alpine as base
 
 FROM base as builder
@@ -15,7 +17,7 @@ RUN apk update && apk add --update tzdata libmagic alpine-sdk libffi libffi-dev 
 
 COPY --from=builder /install /usr/local
 COPY requirements.txt /requirements.txt
-RUN pip3 install -r /requirements.txt
+RUN pip3 install -r /requirements.txt --verbose --progress-bar=off --break-system-packages
 
-COPY __init__.py /app/walkoff_app_sdk/__init__.py
-COPY app_base.py /app/walkoff_app_sdk/app_base.py
+COPY shuffle_sdk/__init__.py /app/walkoff_app_sdk/__init__.py
+COPY shuffle_sdk/shuffle_sdk.py /app/walkoff_app_sdk/app_base.py

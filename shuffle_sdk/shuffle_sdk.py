@@ -3026,7 +3026,7 @@ class AppBase:
 
             #match = ".*?([$]{1}([a-zA-Z0-9_-]+\.?){1}([a-zA-Z0-9#_-]+\.?){0,})" # Removed space - no longer ok. Force underscore.
             #match = "([$]{1}([a-zA-Z0-9_-]+\.?){1}([a-zA-Z0-9#_-]+\.?){0,})" # Removed .*? to make it work with large amounts of data
-            match = "([$]{1}([a-zA-Z0-9_@-]+\.?){1}([a-zA-Z0-9#_@-]+\.?){0,})" # Added @ to the regex
+            match = r"([$]{1}([a-zA-Z0-9_@-]+\.?){1}([a-zA-Z0-9#_@-]+\.?){0,})" # Added @ to the regex
 
             # Extra replacements for certain scenarios
             escaped_dollar = "\\$"
@@ -3519,7 +3519,8 @@ class AppBase:
                             #self.logger.info(f"Returnedvalue: {value}")
                             # OLD: Used until 13.03.2021: submatch = "([${]{2}#?([0-9a-zA-Z_-]+)#?(\[.*\])[}$]{2})"
                             # \${[0-9a-zA-Z_-]+#?(\[.*?]}\$)
-                            submatch = "([${]{2}#?([0-9a-zA-Z_-]+)#?(\[.*?]}\$))"
+                            #submatch = "([${]{2}#?([0-9a-zA-Z_-]+)#?(\[.*?]}\$))"
+                            submatch = r"([${]{2}#?([0-9a-zA-Z_-]+)#?(\[.*?]}\$))"
                             actualitem = re.findall(submatch, value, re.MULTILINE)
                             try:
                                 if action["skip_multicheck"]:
