@@ -17,7 +17,7 @@ RUN apk update && apk add --update tzdata libmagic alpine-sdk libffi libffi-dev 
 
 COPY --from=builder /install /usr/local
 COPY requirements.txt /requirements.txt
-RUN pip3 install -r /requirements.txt --verbose --progress-bar=off --break-system-packages
+RUN pip3 install -r /requirements.txt --verbose --progress-bar=off 
 
 COPY shuffle_sdk/__init__.py /app/walkoff_app_sdk/__init__.py
 COPY shuffle_sdk/shuffle_sdk.py /app/walkoff_app_sdk/app_base.py
