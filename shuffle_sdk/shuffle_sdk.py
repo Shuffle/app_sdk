@@ -3048,6 +3048,9 @@ class AppBase:
 
             # Basic fix in case variant isn't set
             # Variant is ALWAYS STATIC_VALUE from mid 2021~ 
+            if "variant" not in parameter:
+                parameter["variant"] = "STATIC_VALUE"
+
             if not parameter["variant"] or len(parameter["variant"]) < 2:
                 parameter["variant"] = "STATIC_VALUE"
 
