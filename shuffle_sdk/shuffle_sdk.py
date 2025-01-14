@@ -3048,19 +3048,15 @@ class AppBase:
 
             # Basic fix in case variant isn't set
             # Variant is ALWAYS STATIC_VALUE from mid 2021~ 
-            try:
-                parameter["variant"] = parameter["variant"]
-            except:
+            if not parameter["variant"] or len(parameter["variant"]) < 2:
                 parameter["variant"] = "STATIC_VALUE"
 
             # Regex to find all the things
             # Should just go in here if data is ... not so big
-            #if parameter["variant"] == "STATIC_VALUE" and len(parameter["value"]) < 1000000:
-            #if parameter["variant"] == "STATIC_VALUE" and len(parameter["value"]) < 5000000:
             if parameter["variant"] == "STATIC_VALUE":
                 data = parameter["value"]
                 actualitem = re.findall(match, data, re.MULTILINE)
-                #self.logger.debug(f"\n\nHandle static data with JSON: {data}\n\n")
+
                 #self.logger.info("STATIC PARSED: %s" % actualitem)
                 #self.logger.info("[INFO] Done with regex matching")
                 if len(actualitem) > 0:
