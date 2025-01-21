@@ -685,7 +685,19 @@ class AppBase:
         if not "User-Agent" in headers:
             headers["User-Agent"] = "Shuffle App"
 
+        try:
+            #self.logger.info(f"[INFO] Size of result: {len(json.dumps(action_result['result']).encode('utf-8'))}")
+            json_size = len(json.dumps(action_result["result"]).encode('utf-8'))
+            # 20MB limit
+            if json_size > 20000000:
+                action_result["status"] = "FAILURE"
+                action_result["result"] = json.dumps({"success": False, "reason": "Result too large to send to backend. Size: %d MB. Max: 20MB" % (json_size//(1024*1024))})
+        except Exception as e:
+            self.logger.info(f"[ERROR] Failed to get size of result: {e}")
+
+
         self.logger.info(f"[DEBUG][{self.current_execution_id}] Starting to send result to {url}")
+
         try:
             finished = False
             ret = {}
@@ -2008,13 +2020,8 @@ class AppBase:
         try:
             if replace_params == True:
                 for inner_action in self.full_execution["workflow"]["actions"]:
-                    self.logger.info("[DEBUG] ID: %s vs %s" % (inner_action["id"], self.action["id"]))
-
                     # In case of some kind of magic, we're just doing params
-                    if inner_action["id"] != self.action["id"]:
-                        continue
-                        self.logger.info("FOUND!")
-
+                    if inner_action["id"] == self.action["id"]:
                         if isinstance(self.action, str):
                             self.logger.info("Params is in string object for self.action?")
                         else:
