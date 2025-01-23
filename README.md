@@ -36,7 +36,7 @@ if __name__ == "__main__":
 
 ## Testing an app function standalone
 ```bash
-python3 app.py --standalone --action=<actionname> param1=<paramvalue> param2=<paramvalue>
+python3 app.py --standalone --action=repeat_back_to_me '--call={{ "hello" | replace: "o", "lol" }}'
 ```
 
 Example with the [Shuffle Tools app and the "repeat back to me" function](https://github.com/Shuffle/python-apps/blob/678187d1198f5e8fd2072e475dbbbf858728dde8/shuffle-tools/1.2.0/src/app.py#L235)
