@@ -22,6 +22,7 @@ import datetime
 import dateutil
 import threading
 import concurrent.futures
+from shufflepy import Singul
 
 from io import StringIO as StringBuffer, BytesIO 
 from liquid import Liquid, defaults
@@ -1874,10 +1875,70 @@ class AppBase:
         }
 
         if len(self.action) == 0:
-            self.logger.info("[WARNING] ACTION env not defined")
-            self.action_result["result"] = "Error in setup ENV: ACTION not defined"
-            self.send_result(self.action_result, headers, stream_path) 
-            return
+            # Look for argc/argv
+            shouldExit = True
+            if len(sys.argv) > 2:
+                if sys.argv[1] == "standalone" or sys.argv[1] == "--standalone":
+                    self.logger.info("[WARNING] Running standalone")
+                    shouldExit = False
+
+            if shouldExit:
+                self.logger.info("[WARNING] ACTION env not defined. Checking if ran manually")
+                self.action_result["result"] = "Error in setup ENV: ACTION not defined. Use 'python3 shuffle_sdk.py standalone --action=action' to run standalone"
+                self.send_result(self.action_result, headers, stream_path) 
+                return
+
+            print("Running standalone")
+
+            # Look for --action in sys.argv
+            import argparse
+            parser = argparse.ArgumentParser(description="Run an app. Use --action=<action> and fieldname=value to fill a field.")
+
+            # Define the `--action` argument
+            parser.add_argument('--action', type=str, help="Specify the action to run")
+
+            # Parse the arguments
+            # Access the `--action` value
+            args, unknown_args = parser.parse_known_args()
+            if len(args.action) == 0:
+                self.logger.info("[WARNING] --action=function not defined. Exiting")
+                self.action_result["result"] = "Error in setup ENV: ACTION not defined"
+                self.send_result(self.action_result, headers, stream_path) 
+                return
+
+            self.action = {
+                "name": args.action,
+                "parameters": [],
+                "standalone": True,
+
+                "app_name": ""
+            }
+            self.authorization = "standalone"
+            self.current_execution_id = "standalone"
+
+            for key in unknown_args:
+                if "=" not in key:
+                    if "standalone" not in key:
+                        print("Invalid key without '=': %s" % key)
+
+                    continue
+
+                keysplit = key.split("=")
+
+                if len(keysplit) == 2:
+                    self.action["parameters"].append({
+                        "name": keysplit[0].split("--")[1],
+                        "value": keysplit[1],
+
+                        # Required for continuity
+                        "options": None,
+                        "schema": {
+                            "type": "string",
+                        },
+                        "unique_toggled": False,
+                    })
+
+            action = self.action
 
         if len(self.authorization) == 0:
             self.logger.info("[WARING] AUTHORIZATION env not defined")
@@ -1896,7 +1957,10 @@ class AppBase:
 
         # Forcing this to run due to potential self.full_execution loading issues in cloud run
         fullexecution = {}
-        if True or (isinstance(self.full_execution, str) and len(self.full_execution) == 0):
+
+        if self.authorization == "standalone": 
+            pass
+        elif True or (isinstance(self.full_execution, str) and len(self.full_execution) == 0):
             #self.logger.info("[DEBUG] NO EXECUTION - LOADING!")
             try:
                 failed = False
@@ -3987,6 +4051,10 @@ class AppBase:
                                 self.logger.info("Normal result - no list?")
                                 result = results
 
+                    if self.authorization == "standalone": 
+                        print("\n\n===== Result Below =====\n\n %s" % result)
+                        exit()
+
                     self.action_result["status"] = "SUCCESS" 
                     self.action_result["result"] = str(result)
                     if self.action_result["result"] == "":
@@ -4182,6 +4250,7 @@ class AppBase:
         else:
             # Has to start like this due to imports in other apps
             # Move it outside everything?
+            print("Running app without webserver")
             app = cls(redis=None, logger=logger, console_logger=logger)
             
             if isinstance(action, str):
