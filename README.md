@@ -27,19 +27,19 @@ class Example(AppBase):
     def __init__(self):
         pass
 
-    def sample_function(self):
-        return "Hello World"
+    def sample_function(self, paramname):
+        return f"Hello {paramname}"
 
 if __name__ == "__main__":
     Example.run()
 ```
 
-## Testing an app function standalone
+## Testing the SDK
 ```bash
-python3 app.py --standalone --action=repeat_back_to_me '--call={{ "hello" | replace: "o", "lol" }}'
+python3 app.py --standalone --action=sample_function paramname=World
 ```
 
-Example with the [Shuffle Tools app and the "repeat back to me" function](https://github.com/Shuffle/python-apps/blob/678187d1198f5e8fd2072e475dbbbf858728dde8/shuffle-tools/1.2.0/src/app.py#L235)
+Example with Liquid and the [Shuffle Tools app and the "repeat back to me" function](https://github.com/Shuffle/python-apps/blob/678187d1198f5e8fd2072e475dbbbf858728dde8/shuffle-tools/1.2.0/src/app.py#L235)
 ```bash
 python3 app.py --standalone --action=repeat_back_to_me --call=lol
 ```
