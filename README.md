@@ -6,10 +6,8 @@ Released under [Python pip for usage outside of Shuffle](https://pypi.org/projec
 Python apps: [https://github.com/shuffle/python-apps](https://github.com/shuffle/python-apps)
 All apps: [https://shuffler.io/search](https://shuffler.io/search)
 
-## Usage
+## Usage with Shuffle
 Refer to the [Shuffle App Creation docs](https://shuffler.io/docs/app_creation)
-
-**It is NOT meant to be used standalone with python scripts _yet_. This is a coming feature. **
 
 ## Build
 `docker build . -t shuffle/shuffle:app_sdk`
