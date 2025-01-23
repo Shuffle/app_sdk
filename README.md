@@ -20,8 +20,23 @@ pip install shuffle_sdk
 ```
 
 ## Usage
+```python
+from shuffle_sdk import AppBase
+
+class Example(AppBase):
+    def __init__(self):
+        pass
+
+    def sample_function(self):
+        return "Hello World"
+
+if __name__ == "__main__":
+    Example.run()
 ```
-import shuffle_sdk
+
+## Testing an app function standalone
+```
+python3 app.py --standalone --action=<actionname> param1=<paramvalue> param2=<paramvalue>
 ```
 
 ## Adding new [Liquid filters](https://shuffler.io/docs/liquid)
