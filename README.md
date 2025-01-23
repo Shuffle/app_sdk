@@ -1,5 +1,10 @@
 # Shuffle SDK
-This is the SDK used for apps to behave like they should. 
+This is the SDK used for app development, testing and production of ALL apps in Shuffle. Works with manual runs, Docker, k8s, cloud serverless. 
+
+Released under [Python pip for usage outside of Shuffle](https://pypi.org/project/shuffle-sdk/) 
+
+Python apps: [https://github.com/shuffle/python-apps](https://github.com/shuffle/python-apps)
+All apps: [https://shuffler.io/search](https://shuffler.io/search)
 
 ## Usage
 Refer to the [Shuffle App Creation docs](https://shuffler.io/docs/app_creation)
