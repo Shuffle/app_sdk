@@ -1900,8 +1900,6 @@ class AppBase:
                 self.send_result(self.action_result, headers, stream_path) 
                 return
 
-            print("Running standalone")
-
             # Look for --action in sys.argv
             import argparse
             parser = argparse.ArgumentParser(description="Run an app. Use --action=<action> and fieldname=value to fill a field.")
@@ -2077,7 +2075,7 @@ class AppBase:
                     if param["name"] == "body":
                         contains_body = True
 
-            print("[DEBUG][%s] Action name: %s, Params: %d, Has Body: %s" % (self.current_execution_id, self.action["name"], parameter_count, str(contains_body)))
+            self.logger.info("[DEBUG][%s] Action name: %s, Params: %d, Has Body: %s" % (self.current_execution_id, self.action["name"], parameter_count, str(contains_body)))
         except Exception as e:
             print("[ERROR] Failed in init print handler: %s" % e)
 
@@ -3456,7 +3454,10 @@ class AppBase:
         try:
             func = getattr(self, actionname, None)
             if func == None:
-                self.logger.debug(f"[DEBUG] Failed executing {actionname} because func is None (no function specified).")
+                self.logger.debug(f"[DEBUG] Failed executing {actionname} because func is None (no function / wrong action name).")
+                if self.authorization == "standalone": 
+                    exit()
+
                 self.action_result["status"] = "FAILURE" 
                 self.action_result["result"] = json.dumps({
                     "success": False,
@@ -4071,6 +4072,9 @@ class AppBase:
                     #self.logger.debug(f"Data: %s" % action_result)
                 except TypeError as e:
                     self.logger.info("[ERROR] TypeError issue: %s" % e)
+                    if self.authorization == "standalone": 
+                        exit()
+
                     self.action_result["status"] = "FAILURE" 
                     self.action_result["result"] = json.dumps({
                         "success": False, 
