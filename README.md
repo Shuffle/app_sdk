@@ -33,16 +33,20 @@ if __name__ == "__main__":
 ```
 
 ## Testing the SDK
+With the above function as an example
 ```bash
 python3 app.py --standalone --action=sample_function paramname=World
 ```
 
 Example with Liquid and the [Shuffle Tools app and the "repeat back to me" function](https://github.com/Shuffle/python-apps/blob/678187d1198f5e8fd2072e475dbbbf858728dde8/shuffle-tools/1.2.0/src/app.py#L235)
 ```bash
-python3 app.py --standalone --action=repeat_back_to_me --call=lol
+python3 app.py --standalone --action=repeat_back_to_me '--call={{ "hello" | replace: "o", "lol" }}'
 ```
 
 If successful, the output of the function will show in your CLI.
+
+## Building a fully functional Shuffle App
+[Look at the documentation on our website](https://shuffler.io/docs/app_creation)
 
 ## Adding new [Liquid filters](https://shuffler.io/docs/liquid)
 Add a function along these lines:
