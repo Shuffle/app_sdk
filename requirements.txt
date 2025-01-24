@@ -6,7 +6,7 @@ flask[async]==3.1.0
 waitress==3.0.2
 python-dateutil==2.9.0.post0
 PyJWT==2.10.1
-shufflepy==0.0.6
+shufflepy==0.0.7
 
 ## Older versions of everything that USED to work. Check Git blame to find timestamps for when this file has been updated. It requires constant management due to sub-dependencies
 #urllib3==2.2.3

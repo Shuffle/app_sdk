@@ -351,6 +351,24 @@ class AppBase:
         # Make start time with milliseconds
         self.start_time = int(time.time_ns())
 
+        try:
+            singul_apikey = ""
+            singul_executionid = ""
+            if len(self.current_execution_id) > 0:
+                singul_apikey = self.authorization
+                singul_executionid = self.current_execution_id
+            else:
+                pass
+
+            self.singul = Singul(
+                auth=singul_apikey,
+                url=self.base_url,
+                execution_id=singul_executionid,
+            )
+        except ValueError as e:
+            self.logger.error(f"[ERROR] Failed to create Singul object: {e}")
+            self.singul = None
+
         self.action_result = {
             "action": self.action,
             "authorization": self.authorization,
@@ -1889,9 +1907,9 @@ class AppBase:
         if len(self.action) == 0:
             # Look for argc/argv
             shouldExit = True
-            if len(sys.argv) > 2:
+            if len(sys.argv) > 1:
                 if sys.argv[1] == "standalone" or sys.argv[1] == "--standalone":
-                    self.logger.info("[WARNING] Running standalone")
+                    self.logger.info("[WARNING] Running standalone. Use --action=<functionname>")
                     shouldExit = False
 
             if shouldExit:
@@ -1906,15 +1924,17 @@ class AppBase:
 
             # Define the `--action` argument
             parser.add_argument('--action', type=str, help="Specify the action to run")
+            parser.add_argument('--function', type=str, help="Specify the action to run")
 
             # Parse the arguments
             # Access the `--action` value
             args, unknown_args = parser.parse_known_args()
-            if len(args.action) == 0:
-                self.logger.info("[WARNING] --action=function not defined. Exiting")
-                self.action_result["result"] = "Error in setup ENV: ACTION not defined"
-                self.send_result(self.action_result, headers, stream_path) 
-                return
+            if not args.action or len(args.action) == 0:
+                if args.function and len(args.function) > 0:
+                    args.action = args.function
+                else:
+                    self.logger.info("[WARNING] Missing parameter: --action=function")
+                    return
 
             self.action = {
                 "name": args.action,
@@ -1929,16 +1949,21 @@ class AppBase:
             for key in unknown_args:
                 if "=" not in key:
                     if "standalone" not in key:
-                        print("Invalid key without '=': %s" % key)
+                        self.logger.info("Invalid key without '=': %s" % key)
 
                     continue
 
                 keysplit = key.split("=")
 
-                if len(keysplit) == 2:
+                if len(keysplit) >= 2:
+                    newkey = keysplit[0]
+                    namesplit = keysplit[0].split("--")
+                    if len(namesplit) == 2:
+                        newkey = namesplit[1]
+
                     self.action["parameters"].append({
-                        "name": keysplit[0].split("--")[1],
-                        "value": keysplit[1],
+                        "name": newkey,
+                        "value": "=".join(keysplit[1:]),
 
                         # Required for continuity
                         "options": None,
@@ -2824,6 +2849,8 @@ class AppBase:
 
                 all_globals = globals()
                 all_globals["self"] = self
+                all_globals["singul"] = self.singul
+                all_globals["shuffle"] = self.singul
                 run = Liquid(template, mode="wild", from_file=False, filters=shuffle_filters.filters, globals=all_globals)
 
                 # Add locals that are missing to globals
@@ -4060,7 +4087,7 @@ class AppBase:
                                 result = results
 
                     if self.authorization == "standalone": 
-                        print("\n\n===== Result Below =====\n\n %s" % result)
+                        print("\n\n===== Successful result From the Function =====\n\n%s" % result)
                         exit()
 
                     self.action_result["status"] = "SUCCESS" 
