@@ -32,7 +32,7 @@ if __name__ == "__main__":
     Example.run()
 ```
 
-## Testing the SDK
+## Testing Shuffle Apps
 With the above function as an example
 ```bash
 python3 app.py --standalone --action=sample_function paramname=World
