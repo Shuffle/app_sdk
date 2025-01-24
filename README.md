@@ -43,6 +43,11 @@ Example with Liquid and the [Shuffle Tools app and the "repeat back to me" funct
 python3 app.py --standalone --action=repeat_back_to_me '--call={{ "hello" | replace: "o", "lol" }}'
 ```
 
+Example using [Shuffle actions](https://github.com/shuffle/shufflepy) within the "execute_python" function to get emails from Outlook ([app.py](https://github.com/Shuffle/python-apps/blob/678187d1198f5e8fd2072e475dbbbf858728dde8/shuffle-tools/1.2.0/src/app.py#L570))
+```bash
+python3 app.py --standalone --action=execute_python 'code=print(shuffle.run_app(app_id="accdaaf2eeba6a6ed43b2efc0112032d", action="get_emails"))'
+```
+
 If successful, the output of the function will show in your CLI.
 
 ## Building a fully functional Shuffle App
