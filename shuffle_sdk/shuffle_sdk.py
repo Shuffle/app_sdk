@@ -2849,8 +2849,13 @@ class AppBase:
 
                 all_globals = globals()
                 all_globals["self"] = self
-                all_globals["singul"] = self.singul
-                all_globals["shuffle"] = self.singul
+
+                try:
+                    all_globals["singul"] = self.singul
+                    all_globals["shuffle"] = self.singul
+                except Exception as e:
+                    self.logger.info("[ERROR][%s] Failed to set singul in liquid: %s" % (self.current_execution_id, e))
+
                 run = Liquid(template, mode="wild", from_file=False, filters=shuffle_filters.filters, globals=all_globals)
 
                 # Add locals that are missing to globals
