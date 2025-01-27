@@ -110,6 +110,12 @@ def base64_encode(a):
         return base64.b64encode(a).decode()
 
 @shuffle_filters.register
+def shuffle_default(a, default_value):
+    if a in [None, False, 'null', '']:
+        return default_value
+    return a
+
+@shuffle_filters.register
 def random_element(a):
     # Choose a random item from an array
     a = list(a)
