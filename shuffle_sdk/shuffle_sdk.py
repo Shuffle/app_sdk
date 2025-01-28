@@ -111,8 +111,9 @@ def base64_encode(a):
 
 @shuffle_filters.register
 def shuffle_default(a, default_value):
-    if a in [None, False, 'null', '']:
+    if not a or str(a).strip().lower() in ["none", "nil", "null", "undefined", ""]:
         return default_value
+
     return a
 
 @shuffle_filters.register
