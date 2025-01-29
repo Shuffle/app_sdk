@@ -38,14 +38,19 @@ With the above function as an example
 python3 app.py --standalone --action=sample_function paramname=World
 ```
 
-Example with Liquid and the [Shuffle Tools app and the "repeat back to me" function](https://github.com/Shuffle/python-apps/blob/678187d1198f5e8fd2072e475dbbbf858728dde8/shuffle-tools/1.2.0/src/app.py#L235)
+Example wit [Shuffle Tools+Liquid](https://github.com/Shuffle/python-apps/tree/master/shuffle-tools/1.2.0/src) and the [Shuffle Tools app and the "repeat back to me" function](https://github.com/Shuffle/python-apps/blob/678187d1198f5e8fd2072e475dbbbf858728dde8/shuffle-tools/1.2.0/src/app.py#L235)
 ```bash
 python3 app.py --standalone --action=repeat_back_to_me '--call={{ "hello" | replace: "o", "lol" }}'
 ```
 
-Example using [Shuffle actions](https://github.com/shuffle/shufflepy) within the "execute_python" function to get emails from Outlook ([app.py](https://github.com/Shuffle/python-apps/blob/678187d1198f5e8fd2072e475dbbbf858728dde8/shuffle-tools/1.2.0/src/app.py#L570))
+Example using [Shuffle Tools](https://github.com/Shuffle/python-apps/tree/master/shuffle-tools/1.2.0/src) [Shuffle actions](https://github.com/shuffle/shufflepy) within the "execute_python" function to get emails from Outlook ([app.py](https://github.com/Shuffle/python-apps/blob/678187d1198f5e8fd2072e475dbbbf858728dde8/shuffle-tools/1.2.0/src/app.py#L570))
 ```bash
 python3 app.py --standalone --action=execute_python 'code=print(shuffle.run_app(app_id="accdaaf2eeba6a6ed43b2efc0112032d", action="get_emails"))'
+```
+
+Example [LLM inference with the Shuffle-AI app](https://github.com/Shuffle/python-apps/tree/master/shuffle-ai/1.0.0/src). Supports GPU and requires ollama installed and serving. 
+```bash
+python3 app.py --standalone --action=run_llm 'question=convert the following data into a python list of valid ips: 12.3.4.4'
 ```
 
 If successful, the output of the function will show in your CLI.
