@@ -2,12 +2,19 @@ from setuptools import setup, find_packages
 
 def parse_requirements(filename):
     """Load requirements from a requirements.txt file."""
+
+    returns = []
     with open(filename) as f:
-        return [line.strip() for line in f if line.strip() and not line.startswith("#")]
+        for line in f:
+            if line.strip() and not line.startswith("#"):
+                returns.append(line.strip())
+
+    print(returns)
+    return returns
 
 setup(
     name='shuffle_sdk',  
-    version='0.0.',  
+    version='0.0.9',  
     description='The SDK used for Shuffle',  
     py_modules=["shuffle_sdk"],  
     license='MIT',
