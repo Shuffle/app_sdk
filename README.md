@@ -61,6 +61,11 @@ This is mostly the same, but paths and docker is a part of the command.
 docker run frikky/shuffle:shuffle-ai_1.0.0 python3 /app/app.py standalone --action=run_llm '--question=llm, please answer this question thanks'
 ```
 
+With GPU's active in Docker for the LLM (requires [Nvidia Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)):
+```
+docker run --gpus all GPU_LAYERS=8 frikky/shuffle:shuffle-ai_1.0.0 python3 /app/app.py standalone --action=run_llm '--question=llm, please answer this question thanks'
+```
+
 ## Building a fully functional Shuffle App
 [Look at the documentation on our website](https://shuffler.io/docs/app_creation)
 
