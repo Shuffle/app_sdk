@@ -8,12 +8,3 @@ python-dateutil==2.9.0.post0
 PyJWT==2.10.1
 shufflepy==0.0.7
 
-## Older versions of everything that USED to work. Check Git blame to find timestamps for when this file has been updated. It requires constant management due to sub-dependencies
-#urllib3==2.2.3
-#requests==2.32.3
-#MarkupSafe==2.0.1
-#liquidpy==0.8.2
-#flask[async]==3.0.3
-#waitress==3.0.1
-#python-dateutil==2.8.1
-#PyJWT==2.9.0
