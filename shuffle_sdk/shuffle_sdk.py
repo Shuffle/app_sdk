@@ -366,7 +366,7 @@ class AppBase:
                 execution_id=singul_executionid,
             )
         except ValueError as e:
-            self.logger.error(f"[ERROR] Failed to create Singul object: {e}")
+            self.logger.error(f"[WARNING] Not necessary - Failed to create Singul API object: {e}")
             self.singul = None
 
         self.action_result = {

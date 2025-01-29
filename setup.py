@@ -1,8 +1,13 @@
 from setuptools import setup, find_packages
 
+def parse_requirements(filename):
+    """Load requirements from a requirements.txt file."""
+    with open(filename) as f:
+        return [line.strip() for line in f if line.strip() and not line.startswith("#")]
+
 setup(
     name='shuffle_sdk',  
-    version='0.0.8',  
+    version='0.0.',  
     description='The SDK used for Shuffle',  
     py_modules=["shuffle_sdk"],  
     license='MIT',
@@ -12,9 +17,7 @@ setup(
     author_email='frikky@shuffler.io',  
     url='https://github.com/shuffle/shuffle',  
     packages=find_packages(),  
-    install_requires=[  
-        'requests',
-    ],
+    install_requires=parse_requirements("requirements.txt"),  
     classifiers=[  
         'Programming Language :: Python :: 3',
         'License :: OSI Approved :: MIT License',
