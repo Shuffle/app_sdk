@@ -1,17 +1,5 @@
 from setuptools import setup, find_packages
 
-def parse_requirements(filename):
-    """Load requirements from a requirements.txt file."""
-
-    returns = []
-    with open(filename) as f:
-        for line in f:
-            if line.strip() and not line.startswith("#"):
-                returns.append(line.strip())
-
-    print(returns)
-    return returns
-
 setup(
     name='shuffle_sdk',  
     version='0.0.9',  
@@ -24,7 +12,17 @@ setup(
     author_email='frikky@shuffler.io',  
     url='https://github.com/shuffle/shuffle',  
     packages=find_packages(),  
-    install_requires=parse_requirements("requirements.txt"),  
+    install_requires=[
+        "urllib3==2.3.0",
+        "requests==2.32.3",
+        "MarkupSafe==3.0.2",
+        "liquidpy==0.8.2",
+        "flask[async]==3.1.0",
+        "waitress==3.0.2",
+        "python-dateutil==2.9.0.post0",
+        "PyJWT==2.10.1",
+        "shufflepy==0.0.7",
+    ],
     classifiers=[  
         'Programming Language :: Python :: 3',
         'License :: OSI Approved :: MIT License',
