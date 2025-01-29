@@ -55,6 +55,12 @@ python3 app.py --standalone --action=run_llm 'question=convert the following dat
 
 If successful, the output of the function will show in your CLI.
 
+## Testing functions inside Shuffle App images manually
+This is mostly the same, but paths and docker is a part of the command.
+```
+docker run frikky/shuffle:shuffle-ai_1.0.0 python3 /app/app.py standalone --action=run_llm '--question=llm, please answer this question thanks'
+```
+
 ## Building a fully functional Shuffle App
 [Look at the documentation on our website](https://shuffler.io/docs/app_creation)
 
