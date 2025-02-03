@@ -50,7 +50,7 @@ python3 app.py --standalone --action=execute_python 'code=print(shuffle.run_app(
 
 Example [LLM inference with the Shuffle-AI app](https://github.com/Shuffle/python-apps/tree/master/shuffle-ai/1.0.0/src). Supports GPU and requires ollama installed and serving. 
 ```bash
-python3 app.py --standalone --action=run_llm 'question=convert the following data into a python list of valid ips: 12.3.4.4'
+python3 app.py --standalone --action=run_llm 'input=convert the following data into a python list of valid ips: 12.3.4.4'
 ```
 
 If successful, the output of the function will show in your CLI.
@@ -58,12 +58,12 @@ If successful, the output of the function will show in your CLI.
 ## Testing functions inside Shuffle App images manually
 This is mostly the same, but paths and docker is a part of the command.
 ```
-docker run frikky/shuffle:shuffle-ai_1.0.0 python3 /app/app.py standalone --action=run_llm '--question=llm, please answer this question thanks'
+docker run frikky/shuffle:shuffle-ai_1.0.0 python3 /app/app.py standalone --action=run_llm '--input=llm, please answer this question thanks'
 ```
 
 With GPU's active in Docker for the LLM (requires [Nvidia Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)):
 ```
-docker run --gpus all GPU_LAYERS=8 frikky/shuffle:shuffle-ai_1.0.0 python3 /app/app.py standalone --action=run_llm '--question=llm, please answer this question thanks'
+docker run --gpus all GPU_LAYERS=8 frikky/shuffle:shuffle-ai_1.0.0 python3 /app/app.py standalone --action=run_llm '--input=llm, please answer this question thanks'
 ```
 
 ## Building a fully functional Shuffle App
