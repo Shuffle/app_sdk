@@ -376,7 +376,7 @@ class AppBase:
                 execution_id=singul_executionid,
             )
         except ValueError as e:
-            self.logger.error(f"[WARNING] Not necessary - Failed to create Singul API object: {e}")
+            self.logger.error(f"[ERROR] Failed to create Singul API object: {e}")
             self.singul = None
 
         self.action_result = {
@@ -2733,7 +2733,8 @@ class AppBase:
                             resultlabel = result["action"]["label"].replace(" ", "_", -1).lower()
                             if resultlabel.lower() == actionname_lower:
                                 baseresult = result["result"]
-                                break
+                                if "status" in result and result["status"] == "SUCCESS":
+                                    break
                     else:
                         baseresult = "$" + parsersplit[0][1:] 
                     
@@ -3578,9 +3579,7 @@ class AppBase:
                                             self.logger.info(f'[INFO] Added param {val["key"]} for body (using OpenAPI)')
                                             added += 1
 
-                                        #action["parameters"]["body"]
-
-                                        self.logger.info("ADDED %d parameters for body" % added)
+                                        #self.logger.info("[DEBUG] ADDED %d parameters for body" % added)
                                 except KeyError as e:
                                     self.logger.info("KeyError body OpenAPI: %s" % e)
                                     pass
@@ -4259,6 +4258,17 @@ class AppBase:
                             app.base_url = requestdata["base_url"]
                         except Exception as e:
                             extra_info += f"\n{e}"
+
+                        # Singul API
+                        try:
+                            if app.singul == None:
+                                app.singul = Singul(
+                                    auth=requestdata["workflow_execution"]["authorization"],
+                                    url=requestdata["url"],
+                                    execution_id=requestdata["workflow_execution"]["execution_id"],
+                                )
+                        except Exception as e:
+                            print("[ERROR] Failed to create Singul instance: %s" % e)
                         
                         #await 
                         app.execute_action(app.action)
