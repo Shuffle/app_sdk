@@ -1310,7 +1310,9 @@ class AppBase:
                             tmp = func(**subparams)
                             break
                         except TypeError as e:
-                            self.logger.info("BASE TYPEERROR: %s" % e)
+                            if not "shuffle_" in str(e):
+                                self.logger.info("BASE TYPEERROR: %s" % e)
+
                             errorstring = "%s" % e
                             if "got an unexpected keyword argument" in errorstring:
                                 fieldsplit = errorstring.split("'")
@@ -1319,7 +1321,9 @@ class AppBase:
                     
                                     try:
                                         del subparams[field]
-                                        self.logger.info("Removed invalid field %s (1)" % field)
+
+                                        if not field.startswith("shuffle_"):
+                                            self.logger.info("Removed invalid field %s (1)" % field)
                                     except KeyError:
                                         break
                             else:
