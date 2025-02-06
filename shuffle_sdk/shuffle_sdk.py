@@ -3181,11 +3181,36 @@ class AppBase:
                         except IndexError:
                             continue
 
+                        replacement_copy = f"{to_be_replaced}".replace("\.", "\ \.\ ", -1).replace("$", "", -1)
+
                         # Handles for loops etc. 
                         # FIXME: Should it dump to string here? Doesn't that defeat the purpose?
                         # Trying without string dumping.
                         #self.logger.info("TO BE REPLACED: %s" % to_be_replaced)
                         value, is_loop = get_json_value(fullexecution, to_be_replaced) 
+
+                        # Adds debug info for variables we fail to find
+                        try:
+                            if replacement_copy and not str(value):
+
+                                found_param = False
+                                discovery_id = "shuffle_variable_error"
+                                discovery_message = f"Failed finding '{replacement_copy}'"
+                                for param in self.action["parameters"]:
+                                    if param["name"] == discovery_id and param["value"] == discovery_message:
+                                        found_param = True
+                                        break
+
+                                if not found_param:
+                                    self.logger.info(f"[ERROR][{self.current_execution_id}] {discovery_message}'")
+                                    self.action["parameters"].append({
+                                        "name": discovery_id,
+                                        "value": discovery_message,
+                                    })
+
+                        except Exception as e:
+                            self.logger.info(f"[DEBUG] Failed checking if reference was found or not: {e}")
+
 
                         #self.logger.info(f"\n\nType of value: {type(value)}")
                         if isinstance(value, str):
