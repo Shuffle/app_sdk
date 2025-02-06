@@ -1310,10 +1310,10 @@ class AppBase:
                             tmp = func(**subparams)
                             break
                         except TypeError as e:
-                            if not "shuffle_" in str(e):
+                            errorstring = "%s" % e
+                            if not "shuffle_" in errorstring:
                                 self.logger.info("BASE TYPEERROR: %s" % e)
 
-                            errorstring = "%s" % e
                             if "got an unexpected keyword argument" in errorstring:
                                 fieldsplit = errorstring.split("'")
                                 if len(fieldsplit) > 1:
@@ -3185,7 +3185,7 @@ class AppBase:
                         except IndexError:
                             continue
 
-                        replacement_copy = f"{to_be_replaced}".replace("\.", "\ \.\ ", -1).replace("$", "", -1)
+                        replacement_copy = f"{to_be_replaced}".replace(".", " . ", -1).replace("$", "", -1)
 
                         # Handles for loops etc. 
                         # FIXME: Should it dump to string here? Doesn't that defeat the purpose?
