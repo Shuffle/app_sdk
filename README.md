@@ -22,9 +22,6 @@ pip install shuffle_sdk
 from shuffle_sdk import AppBase
 
 class Example(AppBase):
-    def __init__(self):
-        pass
-
     def sample_function(self, paramname):
         return f"Hello {paramname}"
 
