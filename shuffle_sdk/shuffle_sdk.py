@@ -3109,27 +3109,6 @@ class AppBase:
         
             return data 
 
-        # Makes JSON string values into valid strings in JSON
-        # Mainly by removing newlines and such
-        def fix_json_string_value(value):
-            try:
-                value = value.replace("\r\n", "\\r\\n")
-                value = value.replace("\n", "\\n")
-                value = value.replace("\r", "\\r")
-
-                # Fix quotes in the string
-                value = value.replace("\\\"", "\"")
-                value = value.replace("\"", "\\\"")
-
-                value = value.replace("\\\'", "\'")
-                value = value.replace("\'", "\\\'")
-            except Exception as e:
-                pass
-
-            return value
-
-
-
         # Parses parameters sent to it and returns whether it did it successfully with the values found
         def parse_params(action, fullexecution, parameter, self):
             # Skip if it starts with $?
@@ -3577,6 +3556,13 @@ class AppBase:
                             if parameter["name"] == "body": 
                                 bodyindex = counter
 
+                                # FIXME: Remove this as it's just used for testing the 'bodyparse_test' function in the Shuffle Tools with the body '{"key": "${key}", "nokey": "Nokey"}'
+                                if not "value_replace" in parameter:
+                                    parameter["value_replace"] = [{
+                                        "key": "${key}",
+                                        "value": """Hello\\\nThere"""
+                                    }]
+
                                 try:
                                     values = parameter["value_replace"]
                                     if values != None:
@@ -3603,9 +3589,12 @@ class AppBase:
                                                 if "\"" in replace_value and not "\\\"" in replace_value:
                                                     replace_value = replace_value.replace("\"", "\\\"", -1)
 
+                                                if "\n" in replace_value: #and not "\\\n" in replace_value:
+                                                    replace_value = replace_value.replace("\n", "\\n", -1)
+
                                             action["parameters"][counter]["value"] = action["parameters"][counter]["value"].replace(replace_key, replace_value, 1)
 
-                                            self.logger.info(f'[INFO] Added param {val["key"]} for body (using OpenAPI)')
+                                            self.logger.info(f'[INFO] Added param "{val["key"]}" for body (using OpenAPI). ')
                                             added += 1
 
                                         #self.logger.info("[DEBUG] ADDED %d parameters for body" % added)
@@ -3613,10 +3602,7 @@ class AppBase:
                                     self.logger.info("KeyError body OpenAPI: %s" % e)
                                     pass
 
-                                 
                                 action["parameters"][counter]["value"] = recurse_cleanup_script(action["parameters"][counter]["value"])
-
-                        #self.logger.info(action["parameters"])
 
                         # This seems redundant now 
                         for parameter in newparams:
