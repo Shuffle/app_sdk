@@ -1571,7 +1571,10 @@ class AppBase:
         else:
             return returns
 
-    def delete_cache(self, key):
+    def delete_key(self, key, category=""):
+        return self.delete_cache(key, category=category)
+
+    def delete_cache(self, key, category=""):
         org_id = self.full_execution["workflow"]["execution_org"]["id"]
         url = "%s/api/v1/orgs/%s/delete_cache" % (self.url, org_id)
 
@@ -1582,6 +1585,9 @@ class AppBase:
             "org_id": org_id,
             "key": key,
         }
+
+        if category: 
+            data["category"] = category
 
         try:
             newstorage = []
@@ -1605,7 +1611,10 @@ class AppBase:
             #return response.json()
             return json.dumps({"success": False, "reason": f"Failed to delete cache for key '{key}'"})
 
-    def set_cache(self, key, value):
+    def set_key(self, key, value, category=""):
+        return self.set_cache(key, value, category=category)
+
+    def set_cache(self, key, value, category=""):
         org_id = self.full_execution["workflow"]["execution_org"]["id"]
         url = "%s/api/v1/orgs/%s/set_cache" % (self.url, org_id)
         data = {
@@ -1616,6 +1625,9 @@ class AppBase:
             "key": key,
             "value": str(value),
         }
+
+        if category:
+            data["category"] = category
 
         try:
             newstorage = []
@@ -1641,7 +1653,10 @@ class AppBase:
             #return response.json()
             return {"success": False}
 
-    def get_cache(self, key):
+    def get_key(self, key, category=""):
+        return self.get_cache(key, category=category)
+
+    def get_cache(self, key, category=""):
         org_id = self.full_execution["workflow"]["execution_org"]["id"]
         url = "%s/api/v1/orgs/%s/get_cache" % (self.url, org_id)
         data = {
@@ -1651,6 +1666,9 @@ class AppBase:
             "org_id": org_id,
             "key": key,
         }
+
+        if category:
+            data["category"] = category
 
         # Makes it so that loops for the same action doesn't re-ask the db unless necessary
         try:
