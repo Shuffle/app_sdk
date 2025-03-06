@@ -887,7 +887,7 @@ class AppBase:
                 #value = params[key]
                 for param in self.action["parameters"]:
                     try:
-                        if param["name"] == key and param["unique_toggled"]:
+                        if param["name"] == key and "unique_toggled" in param and param["unique_toggled"]:
                             self.logger.info(f"[DEBUG] FOUND: {key} with param {param}!")
                             if isinstance(value, dict) or isinstance(value, list):
                                 try:
@@ -3750,7 +3750,7 @@ class AppBase:
                                     # This code handles files.
                                     isfile = False
                                     try:
-                                        if parameter["schema"]["type"] == "file" and len(value) > 0:
+                                        if "schema" in parameter and "type" in parameter["schema"] and parameter["schema"]["type"] == "file" and len(value) > 0:
                                             self.logger.info("(2) SHOULD HANDLE FILE IN MULTI. Get based on value %s" % parameter["value"]) 
 
                                             for tmp_file_split in json.loads(parameter["value"]):
