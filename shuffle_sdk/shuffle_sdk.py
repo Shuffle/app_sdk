@@ -717,10 +717,16 @@ class AppBase:
         try:
             #self.logger.info(f"[INFO] Size of result: {len(json.dumps(action_result['result']).encode('utf-8'))}")
             json_size = len(json.dumps(action_result["result"]).encode('utf-8'))
-            # 40MB limit
-            if json_size > 40000000:
-                action_result["status"] = "FAILURE"
-                action_result["result"] = json.dumps({"success": False, "reason": "Result too large to send to backend. Size: %d MB. Max: 40MB" % (json_size//(1024*1024))})
+
+            if "shuffler.io" in url or "run.app" in url:
+                # 30MB limit
+                if json_size > 30000000:
+                    action_result["status"] = "FAILURE"
+                    action_result["result"] = json.dumps({
+                        "success": False, 
+                        "reason": "Result too large to send to backend on cloud. Size: %d MB. Max: 30MB" % (json_size//(1024*1024)),
+                        "extra": "Contact support@shuffler.io if you need larger file sizes",
+                    })
         except Exception as e:
             self.logger.info(f"[ERROR] Failed to get size of result: {e}")
 
@@ -755,7 +761,7 @@ class AppBase:
                             headerauth = headers["Authorization"]
 
                         try:
-                            self.logger.info(f"[ERROR] Bad resp ({ret.status_code}) in send_result for url '{url}'. Execution ID: %d, Authorization: %d, Header Auth: %d" % (len(action_result["execution_id"]), len(action_result["authorization"]), len(headerauth)))
+                            self.logger.info(f"[ERROR] Bad resp ({ret.status_code}) in send_result for url '{url}'. Execution ID: %d, Authorization: %d, Header Auth: %d. Raw: %s" % (len(action_result["execution_id"]), len(action_result["authorization"]), len(headerauth), ret.text))
 
                         except Exception as e:
                             self.logger.info(f"[ERROR] Bad resp ({ret.status_code}) in send_result for url '{url}' (no detail)") 
