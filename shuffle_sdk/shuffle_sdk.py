@@ -717,10 +717,10 @@ class AppBase:
         try:
             #self.logger.info(f"[INFO] Size of result: {len(json.dumps(action_result['result']).encode('utf-8'))}")
             json_size = len(json.dumps(action_result["result"]).encode('utf-8'))
-            # 20MB limit
-            if json_size > 20000000:
+            # 40MB limit
+            if json_size > 40000000:
                 action_result["status"] = "FAILURE"
-                action_result["result"] = json.dumps({"success": False, "reason": "Result too large to send to backend. Size: %d MB. Max: 20MB" % (json_size//(1024*1024))})
+                action_result["result"] = json.dumps({"success": False, "reason": "Result too large to send to backend. Size: %d MB. Max: 40MB" % (json_size//(1024*1024))})
         except Exception as e:
             self.logger.info(f"[ERROR] Failed to get size of result: {e}")
 
