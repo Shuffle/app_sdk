@@ -76,3 +76,20 @@ def md5(a):
 ```
 
 This can be used as `{{ "string" | md5 }}`, where `"string"` -> the `a` parameter of the function
+
+## (Scale testing) Running the Shuffle Tools within the Shuffle Tools app locally
+1. Set your env `SHUFFLE_APP_EXPOSED_PORT=8080` and `SHUFFLE_SWARM_CONFIG=run`
+2. Run the [Shuffle Tools app](https://github.com/Shuffle/python-apps/tree/master/shuffle-tools/1.2.0/src) as a webserver: `python3 app.py`
+3. Send a local request to the Shuffle Tools app to run an action within an action. **Make sure to add an authorization & execution_id that exists**
+```
+curl -XPOST http://localhost:8080/api/v1/run -H "Content-Type: application/json" -d '{
+    "action": {"app_name": "shuffle tools", "name": "execute_python", "parameters": [{
+        "name": "code", 
+        "value": "singul.config[\"url\"] = \"https://shuffler.io\";print(singul.run_app(app_id=\"3e2bdf9d5069fe3f4746c29d68785a6a\", action=\"repeat_back_to_me\", parameters=[{\"name\": \"call\", \"value\": \"testing\"}]))"}]
+    }, 
+    "authorization": "",
+    "execution_id": ""}
+'
+```
+
+You can replace the singul.config URL with a local instance for local testing as well.
