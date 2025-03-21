@@ -357,27 +357,12 @@ class AppBase:
         self.current_execution_id = os.getenv("EXECUTIONID", "")
         self.full_execution = os.getenv("FULL_EXECUTION", "") 
         self.result_wrapper_count = 0
+        self.singul = None
 
         # Make start time with milliseconds
         self.start_time = int(time.time_ns())
 
-        try:
-            singul_apikey = ""
-            singul_executionid = ""
-            if len(self.current_execution_id) > 0:
-                singul_apikey = self.authorization
-                singul_executionid = self.current_execution_id
-            else:
-                pass
-
-            self.singul = Singul(
-                auth=singul_apikey,
-                url=self.base_url,
-                execution_id=singul_executionid,
-            )
-        except ValueError as e:
-            self.logger.error(f"[ERROR] Failed to create Singul API object: {e}")
-            self.singul = None
+        self.init_singul()
 
         self.action_result = {
             "action": self.action,
@@ -425,6 +410,25 @@ class AppBase:
 
 
         self.local_storage = []
+
+    def init_singul(self):
+        try:
+            singul_apikey = ""
+            singul_executionid = ""
+            if len(self.current_execution_id) > 0:
+                singul_apikey = self.authorization
+                singul_executionid = self.current_execution_id
+
+            self.singul = Singul(
+                auth=singul_apikey,
+                url=self.base_url,
+                execution_id=singul_executionid,
+            )
+
+            self.logger.info("[DEBUG] Created Singul API object with auth %s, url %s and execution_id %s" % (singul_apikey, self.base_url, singul_executionid))
+        except ValueError as e:
+            self.logger.error(f"[ERROR] Failed to create Singul API object: {e}")
+            self.singul = None
 
     # Checks output for whether it should be automatically parsed or not
     def run_magic_parser(self, input_data):
@@ -2024,6 +2028,9 @@ class AppBase:
             self.action_result["result"] = "Error in setup ENV: EXECUTIONID not defined"
             self.send_result(self.action_result, headers, stream_path) 
             return
+
+        if not self.singul:
+            self.init_singul()
 
         # Verify whether there are any parameters with ACTION_RESULT required
         # If found, we get the full results list from backend
@@ -4264,7 +4271,6 @@ class AppBase:
                         }
         
                     # Remaking class for each request
-        
                     app = cls(redis=None, logger=logger, console_logger=logger)
                     extra_info = ""
                     try:
@@ -4297,17 +4303,6 @@ class AppBase:
                             app.base_url = requestdata["base_url"]
                         except Exception as e:
                             extra_info += f"\n{e}"
-
-                        # Singul API
-                        try:
-                            if app.singul == None:
-                                app.singul = Singul(
-                                    auth=requestdata["workflow_execution"]["authorization"],
-                                    url=requestdata["url"],
-                                    execution_id=requestdata["workflow_execution"]["execution_id"],
-                                )
-                        except Exception as e:
-                            print("[ERROR] Failed to create Singul instance: %s" % e)
                         
                         #await 
                         app.execute_action(app.action)
