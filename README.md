@@ -88,7 +88,8 @@ curl -XPOST http://localhost:8080/api/v1/run -H "Content-Type: application/json"
         "value": "singul.config[\"url\"] = \"https://shuffler.io\";print(singul.run_app(app_id=\"3e2bdf9d5069fe3f4746c29d68785a6a\", action=\"repeat_back_to_me\", parameters=[{\"name\": \"call\", \"value\": \"testing\"}]))"}]
     }, 
     "authorization": "",
-    "execution_id": ""}
+    "execution_id": ""
+}
 '
 ```
 
