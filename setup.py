@@ -21,7 +21,7 @@ setup(
         "waitress==3.0.2",
         "python-dateutil==2.9.0.post0",
         "PyJWT==2.10.1",
-        "shufflepy==0.0.7",
+        "shufflepy==0.0.8",
     ],
     classifiers=[  
         'Programming Language :: Python :: 3',
