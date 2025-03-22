@@ -1,11 +1,9 @@
 name: Upload App SDK to PiPy
 
+# Make a new release in the repo to build it. 
+# This makes it work with trusted publishers.
+
 on:
-  workflow_dispatch:  # Allows the workflow to be run manually from GitHub
-    inputs:
-      version:
-        description: 'Version of the package to publish'
-        required: true
   release:
     types: [published]
   push:
