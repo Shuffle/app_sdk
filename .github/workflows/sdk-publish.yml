@@ -36,7 +36,7 @@ jobs:
         python -m build
 
     - name: Publish package
-      uses: pypa/gh-action-pypi-publish@v1.10.2
+      uses: pypa/gh-action-pypi-publish@v1.12.4
       with:
         verify-metadata: false
         repository-url: https://upload.pypi.org/legacy/
