@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='shuffle_sdk',  
-    version='0.0.20',  
+    version='0.0.21',  
     description='The SDK used for Shuffle',  
     py_modules=["shuffle_sdk"],  
     license='MIT',
@@ -21,7 +21,7 @@ setup(
         "waitress==3.0.2",
         "python-dateutil==2.9.0.post0",
         "PyJWT==2.10.1",
-        "shufflepy==0.0.8",
+        "shufflepy==0.0.9",
     ],
     classifiers=[  
         'Programming Language :: Python :: 3',
