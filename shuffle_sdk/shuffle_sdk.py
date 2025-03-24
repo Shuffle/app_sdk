@@ -1228,7 +1228,6 @@ class AppBase:
             
 
     # Runs recursed versions with inner loops and such 
-    #async def run_recursed_items(self, func, baseparams, loop_wrapper):
     def run_recursed_items(self, func, baseparams, loop_wrapper):
         #self.logger.info(f"PRE RECURSED ITEMS: {baseparams}")
         has_loop = False
@@ -3876,6 +3875,11 @@ class AppBase:
                                 pass
 
                         if os.getenv("DEBUG").lower() == "true":
+
+                            # Used for multi testing
+                            if not multiexecution:
+                                multiexecution = True
+
                             self.logger.info(f"[DEBUG] Param: {params}")
                             self.logger.info(f"[DEBUG] Multiparams: {multi_parameters}")
 
@@ -4114,7 +4118,6 @@ class AppBase:
                             # 1. Use number of executions based on the arrays being similar
                             # 2. Find the right value from the parsed multi_params
 
-                            #self.logger.info("[INFO] Running WITH loop. MULTI: %s", multi_parameters)
                             json_object = False
 
                             if os.getenv("DEBUG").lower() != "true":
@@ -4128,21 +4131,21 @@ class AppBase:
                                     if not future.done():
                                         # The future is still running, so we need to cancel it
                                         future.cancel()
-                                        results = json.dumps({
+                                        results = json.dumps([{
                                             "success": False,
                                             "exception": str(e),
-                                            "reason": "Timeout error within %d seconds (1). This happens if we can't reach or use the API you're trying to use within the time limit. Configure SHUFFLE_APP_SDK_TIMEOUT=100 in Orborus to increase it to 100 seconds. Not changeable for cloud." % timeout,
-                                        })
+                                            "reason": "Loop (%d) Timeout error within %d seconds (1). This happens if we can't reach or use the API you're trying to use within the time limit. Configure SHUFFLE_APP_SDK_TIMEOUT=100 in Orborus to increase it to 100 seconds. Not changeable for cloud." % (item_count, timeout),
+                                        }])
 
                                     else:
                                         # The future is done, so we can just get the result from newres :)
                                         pass
 
                                 except concurrent.futures.TimeoutError as e:
-                                    results = json.dumps({
+                                    results = json.dumps([{
                                         "success": False,
-                                        "reason": "Timeout error (2) within %d seconds (2). This happens if we can't reach or use the API you're trying to use within the time limit. Configure SHUFFLE_APP_SDK_TIMEOUT=100 in Orborus to increase it to 100 seconds. Not changeable for cloud." % timeout,
-                                    })
+                                        "reason": "Loop (%d) Timeout error (2) within %d seconds (2). This happens if we can't reach or use the API you're trying to use within the time limit. Configure SHUFFLE_APP_SDK_TIMEOUT=100 in Orborus to increase it to 100 seconds. Not changeable for cloud." % (item_count, timeout),
+                                    }])
 
 
 
