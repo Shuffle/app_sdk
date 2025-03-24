@@ -425,9 +425,12 @@ class AppBase:
                 execution_id=singul_executionid,
             )
 
-            self.logger.info("[DEBUG] Created Singul API object with auth %s, url %s and execution_id %s" % (singul_apikey, self.base_url, singul_executionid))
+            if os.getenv("DEBUG").lower() == "true":
+                self.logger.info("[DEBUG] Created Singul API object with auth %s, url %s and execution_id %s" % (singul_apikey, self.base_url, singul_executionid))
         except ValueError as e:
-            self.logger.error(f"[ERROR] Failed to create Singul API object: {e}")
+            if os.getenv("DEBUG").lower() == "true":
+                self.logger.error(f"[ERROR] Failed to create Singul API object: {e}")
+
             self.singul = None
 
     # Checks output for whether it should be automatically parsed or not
@@ -1152,10 +1155,15 @@ class AppBase:
                 #self.logger.info(f"{value} is not a list")
                 pass
 
-        self.logger.info("[DEBUG] Listlengths: %s - listitems: %d" % (listlengths, len(listitems)))
+        
+        if os.getenv("DEBUG").lower() == "true":
+            self.logger.info("[DEBUG] Listlengths: %s - listitems: %d" % (listlengths, len(listitems)))
+
         #if len(listitems) == 0:
         if len(listlengths) == 0:
-            self.logger.info("[DEBUG] NO multiplier. Running a single iteration.")
+            if os.getenv("DEBUG").lower() == "true":
+                self.logger.info("[DEBUG] NO multiplier. Running a single iteration.")
+
             paramlist.append(baseparams)
 
         #elif len(listitems) == 1:
@@ -1407,9 +1415,9 @@ class AppBase:
                 ret.append(new_value)
 
             #self.logger.info("[INFO] Function return length: %d" % len(ret))
-            if len(ret) == 1:
-                #ret = ret[0]
-                self.logger.info("[DEBUG] DONT make list of 1 into 0!!")
+            #if len(ret) == 1:
+            #ret = ret[0]
+            #self.logger.info("[DEBUG] DONT make list of 1 into 0!!")
 
         self.logger.info(f"[DEBUG][%s] Done with execution recursion %d times" % (self.current_execution_id, len(param_multiplier)))
 
@@ -2145,7 +2153,7 @@ class AppBase:
                     if param["name"] == "body":
                         contains_body = True
 
-            self.logger.info("[DEBUG][%s] Action name: %s, Params: %d, Has Body: %s" % (self.current_execution_id, self.action["name"], parameter_count, str(contains_body)))
+            self.logger.info("[INFO][%s] Action name: %s, Params: %d, Has Body: %s" % (self.current_execution_id, self.action["name"], parameter_count, str(contains_body)))
         except Exception as e:
             print("[ERROR] Failed in init print handler: %s" % e)
 
@@ -3867,11 +3875,22 @@ class AppBase:
                                 #self.logger.info(f"Error with subparam deletion of {subparam} in {multi_parameters} (2)")
                                 pass
 
-                        #self.logger.info()
-                        #self.logger.info(f"Param: {params}")
-                        #self.logger.info(f"Multiparams: {multi_parameters}")
-                        #self.logger.info()
-                        
+                        if os.getenv("DEBUG").lower() == "true":
+                            self.logger.info(f"[DEBUG] Param: {params}")
+                            self.logger.info(f"[DEBUG] Multiparams: {multi_parameters}")
+
+                        timeout = 30 
+                        if "app_name" in self.action and (self.action["app_name"].lower() == "shuffle tools" or self.action["app_name"].lower() == "shuffle subflow"):
+                            timeout = 55
+
+                        timeout_env = os.getenv("SHUFFLE_APP_SDK_TIMEOUT", timeout)
+                        try:
+                            timeout = int(timeout_env)
+                            #self.logger.info(f"[DEBUG] Timeout set to {timeout} seconds")  
+                        except Exception as e:
+                            self.logger.info(f"[ERROR] Failed parsing timeout to int: {e}")
+
+                        # Single exec
                         if not multiexecution:
                             #self.logger.info("NOT MULTI EXEC")
                             # Runs a single iteration here
@@ -3935,22 +3954,12 @@ class AppBase:
                                     # Individual functions shouldn't take longer than this
                                     # This is an attempt to make timeouts occur less, incentivizing users to make use efficient API's
                                     # PS: Not implemented for lists - only single actions as of May 2023
-                                    timeout = 30 
 
                                     # Check if current app is Shuffle Tools, then set to 55 due to certain actions being slow (ioc parser..) 
                                     # In general, this should be disabled for onprem 
-                                    if self.action["app_name"].lower() == "shuffle tools":
-                                        timeout = 55
-
-                                    timeout_env = os.getenv("SHUFFLE_APP_SDK_TIMEOUT", timeout)
-                                    try:
-                                        timeout = int(timeout_env)
-                                        #self.logger.info(f"[DEBUG] Timeout set to {timeout} seconds")  
-                                    except Exception as e:
-                                        self.logger.info(f"[ERROR] Failed parsing timeout to int: {e}")
 
                                     #timeout = 30 
-                                    self.logger.info("[DEBUG][%s] Running function '%s' with timeout %d" % (self.current_execution_id, action["name"], timeout))
+                                    self.logger.info("[INFO][%s] Running function '%s' with timeout %d" % (self.current_execution_id, action["name"], timeout))
 
                                     try:
                                         executor = concurrent.futures.ThreadPoolExecutor()
@@ -4099,14 +4108,44 @@ class AppBase:
                                     self.logger.info("Can't handle type %s value from function" % (type(newres)))
 
                         else:
-                            #self.logger.info("[INFO] APP_SDK DONE: Starting MULTI execution (length: %d) with values %s" % (minlength, multi_parameters))
+                            if os.getenv("DEBUG").lower() == "true":
+                                self.logger.info("[DEBUG] APP_SDK DONE: Starting MULTI execution (length: %d) with values %s" % (minlength, multi_parameters))
+
                             # 1. Use number of executions based on the arrays being similar
                             # 2. Find the right value from the parsed multi_params
 
                             #self.logger.info("[INFO] Running WITH loop. MULTI: %s", multi_parameters)
                             json_object = False
-                            #results = await self.run_recursed_items(func, multi_parameters, {})
-                            results = self.run_recursed_items(func, multi_parameters, {})
+
+                            if os.getenv("DEBUG").lower() != "true":
+                                results = self.run_recursed_items(func, multi_parameters, {})
+                            else:
+                                try:
+                                    executor = concurrent.futures.ThreadPoolExecutor()
+                                    future = executor.submit(self.run_recursed_items, func, multi_parameters, {})
+                                    results = future.result(timeout)
+
+                                    if not future.done():
+                                        # The future is still running, so we need to cancel it
+                                        future.cancel()
+                                        results = json.dumps({
+                                            "success": False,
+                                            "exception": str(e),
+                                            "reason": "Timeout error within %d seconds (1). This happens if we can't reach or use the API you're trying to use within the time limit. Configure SHUFFLE_APP_SDK_TIMEOUT=100 in Orborus to increase it to 100 seconds. Not changeable for cloud." % timeout,
+                                        })
+
+                                    else:
+                                        # The future is done, so we can just get the result from newres :)
+                                        pass
+
+                                except concurrent.futures.TimeoutError as e:
+                                    results = json.dumps({
+                                        "success": False,
+                                        "reason": "Timeout error (2) within %d seconds (2). This happens if we can't reach or use the API you're trying to use within the time limit. Configure SHUFFLE_APP_SDK_TIMEOUT=100 in Orborus to increase it to 100 seconds. Not changeable for cloud." % timeout,
+                                    })
+
+
+
                             if isinstance(results, dict) or isinstance(results, list):
                                 json_object = True
 
@@ -4143,7 +4182,7 @@ class AppBase:
                                     result = result[:-2]
                                     result += "]"
                             else:
-                                self.logger.info("Normal result - no list?")
+                                #self.logger.info("Normal result - no list?")
                                 result = results
 
                     if self.authorization == "standalone": 
@@ -4201,7 +4240,8 @@ class AppBase:
 
         except Exception as e:
             self.logger.info(f"[ERROR] Failed to execute: {e}")
-            self.logger.exception(f"[ERROR] Failed to execute {e}-{action['id']}")
+            if "id" in action:
+                self.logger.exception(f"[ERROR] Failed to execute {e}-{action['id']}")
             self.action_result["status"] = "FAILURE" 
             try:
                 e = json.loads(f"{e}")
