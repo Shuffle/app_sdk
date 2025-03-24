@@ -1418,7 +1418,8 @@ class AppBase:
             #ret = ret[0]
             #self.logger.info("[DEBUG] DONT make list of 1 into 0!!")
 
-        self.logger.info(f"[DEBUG][%s] Done with execution recursion %d times" % (self.current_execution_id, len(param_multiplier)))
+        if os.getenv("DEBUG", "").lower() == "true":
+            self.logger.info(f"[DEBUG][%s] Done with execution recursion %d time(s)" % (self.current_execution_id, len(param_multiplier)))
 
         #self.logger.info("Return from execution: %s" % ret)
         if ret == None:
@@ -3780,9 +3781,9 @@ class AppBase:
 
                                             isfile = True
                                     except KeyError as e:
-                                        self.logger.info("(2) SCHEMA ERROR IN FILE HANDLING: %s" % e)
+                                        self.logger.info("[ERROR] (2) SCHEMA ERROR IN FILE HANDLING: %s" % e)
                                     except json.decoder.JSONDecodeError as e:
-                                        self.logger.info("(2) JSON ERROR IN FILE HANDLING: %s" % e)
+                                        self.logger.info("[ERROR] (2) JSON ERROR IN FILE HANDLING: %s" % e)
 
                                     if not isfile:
                                         #tmpitem = tmpitem.replace("\\\\", "\\", -1)
@@ -3827,7 +3828,7 @@ class AppBase:
                                         params[parameter["name"]] = file_value 
                                         multi_parameters[parameter["name"]] = file_value 
                                 except KeyError as e:
-                                    self.logger.info("SCHEMA ERROR IN FILE HANDLING: %s" % e)
+                                    self.logger.info("[ERROR] SCHEMA ERROR IN FILE HANDLING: %s" % e)
 
                             
                         # Fix lists here
@@ -3877,8 +3878,8 @@ class AppBase:
                         if os.getenv("DEBUG", "").lower() == "true":
 
                             # Used for multi testing
-                            if not multiexecution:
-                                multiexecution = True
+                            #if not multiexecution:
+                            #    multiexecution = True
 
                             self.logger.info(f"[DEBUG] Param: {params}")
                             self.logger.info(f"[DEBUG] Multiparams: {multi_parameters}")
@@ -4117,35 +4118,34 @@ class AppBase:
 
                             # 1. Use number of executions based on the arrays being similar
                             # 2. Find the right value from the parsed multi_params
-
                             json_object = False
 
-                            if os.getenv("DEBUG", "").lower() != "true":
-                                results = self.run_recursed_items(func, multi_parameters, {})
-                            else:
-                                try:
-                                    executor = concurrent.futures.ThreadPoolExecutor()
-                                    future = executor.submit(self.run_recursed_items, func, multi_parameters, {})
-                                    results = future.result(timeout)
+                            #if os.getenv("DEBUG", "").lower() != "true":
+                            #    results = self.run_recursed_items(func, multi_parameters, {})
+                            #else:
+                            try:
+                                executor = concurrent.futures.ThreadPoolExecutor()
+                                future = executor.submit(self.run_recursed_items, func, multi_parameters, {})
+                                results = future.result(timeout)
 
-                                    if not future.done():
-                                        # The future is still running, so we need to cancel it
-                                        future.cancel()
-                                        results = json.dumps([{
-                                            "success": False,
-                                            "exception": str(e),
-                                            "reason": "Loop (%d) Timeout error within %d seconds (1). This happens if we can't reach or use the API you're trying to use within the time limit. Configure SHUFFLE_APP_SDK_TIMEOUT=100 in Orborus to increase it to 100 seconds. Not changeable for cloud." % (item_count, timeout),
-                                        }])
-
-                                    else:
-                                        # The future is done, so we can just get the result from newres :)
-                                        pass
-
-                                except concurrent.futures.TimeoutError as e:
+                                if not future.done():
+                                    # The future is still running, so we need to cancel it
+                                    future.cancel()
                                     results = json.dumps([{
                                         "success": False,
-                                        "reason": "Loop (%d) Timeout error (2) within %d seconds (2). This happens if we can't reach or use the API you're trying to use within the time limit. Configure SHUFFLE_APP_SDK_TIMEOUT=100 in Orborus to increase it to 100 seconds. Not changeable for cloud." % (item_count, timeout),
+                                        "exception": str(e),
+                                        "reason": "Loop Timeout error within %d seconds (1). This happens if we can't reach or use the API you're trying to use within the time limit. Configure SHUFFLE_APP_SDK_TIMEOUT=100 in Orborus to increase it to 100 seconds. Not changeable for cloud." % (timeout),
                                     }])
+
+                                else:
+                                    # The future is done, so we can just get the result from newres :)
+                                    pass
+
+                            except concurrent.futures.TimeoutError as e:
+                                results = json.dumps([{
+                                    "success": False,
+                                    "reason": "Loop Timeout error (2) within %d seconds (2). This happens if we can't reach or use the API you're trying to use within the time limit. Configure SHUFFLE_APP_SDK_TIMEOUT=100 in Orborus to increase it to 100 seconds. Not changeable for cloud." % (timeout),
+                                }])
 
 
 
