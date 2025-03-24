@@ -425,10 +425,10 @@ class AppBase:
                 execution_id=singul_executionid,
             )
 
-            if os.getenv("DEBUG").lower() == "true":
+            if os.getenv("DEBUG", "").lower() == "true":
                 self.logger.info("[DEBUG] Created Singul API object with auth %s, url %s and execution_id %s" % (singul_apikey, self.base_url, singul_executionid))
         except ValueError as e:
-            if os.getenv("DEBUG").lower() == "true":
+            if os.getenv("DEBUG", "").lower() == "true":
                 self.logger.error(f"[ERROR] Failed to create Singul API object: {e}")
 
             self.singul = None
@@ -1156,12 +1156,12 @@ class AppBase:
                 pass
 
         
-        if os.getenv("DEBUG").lower() == "true":
+        if os.getenv("DEBUG", "").lower() == "true":
             self.logger.info("[DEBUG] Listlengths: %s - listitems: %d" % (listlengths, len(listitems)))
 
         #if len(listitems) == 0:
         if len(listlengths) == 0:
-            if os.getenv("DEBUG").lower() == "true":
+            if os.getenv("DEBUG", "").lower() == "true":
                 self.logger.info("[DEBUG] NO multiplier. Running a single iteration.")
 
             paramlist.append(baseparams)
@@ -3874,7 +3874,7 @@ class AppBase:
                                 #self.logger.info(f"Error with subparam deletion of {subparam} in {multi_parameters} (2)")
                                 pass
 
-                        if os.getenv("DEBUG").lower() == "true":
+                        if os.getenv("DEBUG", "").lower() == "true":
 
                             # Used for multi testing
                             if not multiexecution:
@@ -4112,7 +4112,7 @@ class AppBase:
                                     self.logger.info("Can't handle type %s value from function" % (type(newres)))
 
                         else:
-                            if os.getenv("DEBUG").lower() == "true":
+                            if os.getenv("DEBUG", "").lower() == "true":
                                 self.logger.info("[DEBUG] APP_SDK DONE: Starting MULTI execution (length: %d) with values %s" % (minlength, multi_parameters))
 
                             # 1. Use number of executions based on the arrays being similar
@@ -4120,7 +4120,7 @@ class AppBase:
 
                             json_object = False
 
-                            if os.getenv("DEBUG").lower() != "true":
+                            if os.getenv("DEBUG", "").lower() != "true":
                                 results = self.run_recursed_items(func, multi_parameters, {})
                             else:
                                 try:
