@@ -1877,6 +1877,20 @@ class AppBase:
             except Exception as e:
                 self.logger.info(f"[WARNING] Failed to check if larger than as list: {e}")
 
+            try:
+                if not sourcevalue.isdigit() and destinationvalue.isdigit():
+                    if len(str(sourcevalue)) > int(destinationvalue):
+                        return True
+            except Exception as e:
+                self.logger.info(f"[WARNING] Failed to check if larger than as string: {e}")
+
+            try:
+                if not destinationvalue.isdigit() and sourcevalue.isdigit():
+                    if int(sourcevalue) > len(str(destinationvalue)):
+                        return True
+            except Exception as e:
+                self.logger.info(f"[WARNING] Failed to check if larger than as string: {e}")
+
 
         # FIXME: This will be buggy if using < and <= operators in the future.
         elif check.lower() == "smaller than" or check.lower() == "less than" or check == "<" or check == "<=":
@@ -1901,6 +1915,22 @@ class AppBase:
                     return True
             except Exception as e:
                 self.logger.info(f"[WARNING] Failed to check if smaller than as list: {e}")
+
+            try:
+                if not sourcevalue.isdigit() and destinationvalue.isdigit():
+                    if len(str(sourcevalue)) < int(destinationvalue):
+                        return True
+
+            except Exception as e:
+                self.logger.info(f"[WARNING] Failed to check if smaller than as string: {e}")
+
+            try:
+                if sourcevalue.isdigit() and not destinationvalue.isdigit():
+                    if int(sourcevalue) < len(str(destinationvalue)):
+                        return True
+
+            except Exception as e:
+                self.logger.info(f"[WARNING] Failed to check if smaller than as string: {e}")
 
         elif check.lower() == "re" or check.lower() == "matches regex":
             try:
