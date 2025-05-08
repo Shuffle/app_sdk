@@ -328,6 +328,7 @@ def url_decode(base):
 ###
 ###
 
+pastAppExecutions = []
 
 class AppBase:
     __version__ = None
@@ -335,6 +336,7 @@ class AppBase:
 
     def __init__(self, redis=None, logger=None, console_logger=None):#, docker_client=None):
         self.logger = logger if logger is not None else logging.getLogger("AppBaseLogger")
+        global pastAppExecutions
 
         if not os.getenv("SHUFFLE_LOGS_DISABLED") == "true":
             self.log_capture_string = StringBuffer()
@@ -360,6 +362,13 @@ class AppBase:
 
         # Make start time with milliseconds
         self.start_time = int(time.time_ns())
+        fullKey = str(self.current_execution_id) + "-" + str(self.action["id"])
+
+        if fullKey in pastAppExecutions:
+            return
+
+        pastAppExecutions.append(fullKey)
+        pastAppExecutions = pastAppExecutions[-50:]
 
         try:
             singul_apikey = ""
