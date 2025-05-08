@@ -1,11 +1,9 @@
 name: Upload App SDK to PiPy
 
+# Make a new release in the repo to build it. 
+# This makes it work with trusted publishers.
+
 on:
-  workflow_dispatch:  # Allows the workflow to be run manually from GitHub
-    inputs:
-      version:
-        description: 'Version of the package to publish'
-        required: true
   release:
     types: [published]
   push:
@@ -36,7 +34,7 @@ jobs:
         python -m build
 
     - name: Publish package
-      uses: pypa/gh-action-pypi-publish@v1.10.2
+      uses: pypa/gh-action-pypi-publish@v1.12.4
       with:
         verify-metadata: false
         repository-url: https://upload.pypi.org/legacy/
