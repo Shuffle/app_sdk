@@ -362,13 +362,21 @@ class AppBase:
 
         # Make start time with milliseconds
         self.start_time = int(time.time_ns())
-        fullKey = str(self.current_execution_id) + "-" + str(self.action["id"])
+        try:
+            if isinstance(self.action, str):
+                self.action = json.loads(self.action)
 
-        if fullKey in pastAppExecutions:
-            return
+            action_id = self.action.get("id")
+            fullKey = str(self.current_execution_id) + "-" + str(action_id)
+            if fullKey in pastAppExecutions:
+                self.logger.info(f"[INFO] Duplicate execution detected for execution id - {self.current_execution_id} and action - {self.action["id"]}")
+                return
 
-        pastAppExecutions.append(fullKey)
-        pastAppExecutions = pastAppExecutions[-50:]
+            pastAppExecutions.append(fullKey)
+            if len(pastAppExecutions) > 50:
+                pastAppExecutions[:] = pastAppExecutions[-50:]
+        except Exception as e:
+            self.logger.info(f"[ERROR] Failed to access action ID in the execution({self.current_execution_id}): {e}")
 
         try:
             singul_apikey = ""
