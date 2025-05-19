@@ -370,7 +370,7 @@ class AppBase:
             action_id = self.action.get("id")
             fullKey = str(self.current_execution_id) + "-" + str(action_id)
             if fullKey in pastAppExecutions:
-                self.logger.error(f"[ERROR] Duplicate execution detected for execution id - {self.current_execution_id} and action - {self.action["id"]}")
+                self.logger.error(f"[ERROR] Duplicate execution detected for execution id - {self.current_execution_id} and action - {str(action_id)}")
                 return
 
             pastAppExecutions.append(fullKey)
