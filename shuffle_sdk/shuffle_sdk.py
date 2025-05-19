@@ -328,6 +328,7 @@ def url_decode(base):
 ###
 ###
 
+pastAppExecutions = []
 
 class AppBase:
     __version__ = None
@@ -335,6 +336,7 @@ class AppBase:
 
     def __init__(self, redis=None, logger=None, console_logger=None):#, docker_client=None):
         self.logger = logger if logger is not None else logging.getLogger("AppBaseLogger")
+        global pastAppExecutions
 
         if not os.getenv("SHUFFLE_LOGS_DISABLED") == "true":
             self.log_capture_string = StringBuffer()
@@ -361,6 +363,21 @@ class AppBase:
 
         # Make start time with milliseconds
         self.start_time = int(time.time_ns())
+        try:
+            if isinstance(self.action, str):
+                self.action = json.loads(self.action)
+
+            action_id = self.action.get("id")
+            fullKey = str(self.current_execution_id) + "-" + str(action_id)
+            if fullKey in pastAppExecutions:
+                self.logger.error(f"[ERROR] Duplicate execution detected for execution id - {self.current_execution_id} and action - {str(action_id)}")
+                return
+
+            pastAppExecutions.append(fullKey)
+            if len(pastAppExecutions) > 50:
+                pastAppExecutions[:] = pastAppExecutions[-50:]
+        except Exception as e:
+            self.logger.info(f"[ERROR] Failed to access action ID in the execution({self.current_execution_id}): {e}")
 
         self.init_singul()
 
