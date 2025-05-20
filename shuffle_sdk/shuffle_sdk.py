@@ -2597,7 +2597,6 @@ class AppBase:
 
                     # Checks specific regex like #1-2 for index 1-2 in a loop
                     elif len(actualitem) > 0:
-
                         is_loop = True
                         newvalue = []
                         firstitem = actualitem[0][0]
@@ -2684,7 +2683,15 @@ class AppBase:
                                             pass
 
                                 except json.decoder.JSONDecodeError as e:
-                                    return str(basejson[value]), False
+                                    if "Expecting value: line 1 column 2" in str(e):
+                                        try:
+                                            self.logger.info(f"[WARNING] Failed to load json object trying different approach")
+                                            obj = ast.literal_eval(basejson[value])
+                                            basejson = obj if isinstance(obj, (dict, list)) else json.loads(json.dumps(obj))
+                                        except:
+                                            return str(basejson[value]), False
+                                    else:
+                                        return str(basejson[value]), False
                             else:
                                 basejson = basejson[value]
                         except KeyError as e:
