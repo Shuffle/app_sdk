@@ -328,6 +328,7 @@ def url_decode(base):
 ###
 ###
 
+pastAppExecutions = []
 
 class AppBase:
     __version__ = None
@@ -335,6 +336,7 @@ class AppBase:
 
     def __init__(self, redis=None, logger=None, console_logger=None):#, docker_client=None):
         self.logger = logger if logger is not None else logging.getLogger("AppBaseLogger")
+        global pastAppExecutions
 
         if not os.getenv("SHUFFLE_LOGS_DISABLED") == "true":
             self.log_capture_string = StringBuffer()
@@ -357,27 +359,27 @@ class AppBase:
         self.current_execution_id = os.getenv("EXECUTIONID", "")
         self.full_execution = os.getenv("FULL_EXECUTION", "") 
         self.result_wrapper_count = 0
+        self.singul = None
 
         # Make start time with milliseconds
         self.start_time = int(time.time_ns())
-
         try:
-            singul_apikey = ""
-            singul_executionid = ""
-            if len(self.current_execution_id) > 0:
-                singul_apikey = self.authorization
-                singul_executionid = self.current_execution_id
-            else:
-                pass
+            if isinstance(self.action, str):
+                self.action = json.loads(self.action)
 
-            self.singul = Singul(
-                auth=singul_apikey,
-                url=self.base_url,
-                execution_id=singul_executionid,
-            )
-        except ValueError as e:
-            self.logger.error(f"[ERROR] Failed to create Singul API object: {e}")
-            self.singul = None
+            action_id = self.action.get("id")
+            fullKey = str(self.current_execution_id) + "-" + str(action_id)
+            if fullKey in pastAppExecutions:
+                self.logger.error(f"[ERROR] Duplicate execution detected for execution id - {self.current_execution_id} and action - {str(action_id)}")
+                return
+
+            pastAppExecutions.append(fullKey)
+            if len(pastAppExecutions) > 50:
+                pastAppExecutions[:] = pastAppExecutions[-50:]
+        except Exception as e:
+            self.logger.info(f"[ERROR] Failed to access action ID in the execution({self.current_execution_id}): {e}")
+
+        self.init_singul()
 
         self.action_result = {
             "action": self.action,
@@ -425,6 +427,28 @@ class AppBase:
 
 
         self.local_storage = []
+
+    def init_singul(self):
+        try:
+            singul_apikey = ""
+            singul_executionid = ""
+            if len(self.current_execution_id) > 0:
+                singul_apikey = self.authorization
+                singul_executionid = self.current_execution_id
+
+            self.singul = Singul(
+                auth=singul_apikey,
+                url=self.base_url,
+                execution_id=singul_executionid,
+            )
+
+            if os.getenv("DEBUG", "").lower() == "true":
+                self.logger.info("[DEBUG] Created Singul API object with auth %s, url %s and execution_id %s" % (singul_apikey, self.base_url, singul_executionid))
+        except ValueError as e:
+            if os.getenv("DEBUG", "").lower() == "true":
+                self.logger.error(f"[ERROR] Failed to create Singul API object: {e}")
+
+            self.singul = None
 
     # Checks output for whether it should be automatically parsed or not
     def run_magic_parser(self, input_data):
@@ -717,10 +741,16 @@ class AppBase:
         try:
             #self.logger.info(f"[INFO] Size of result: {len(json.dumps(action_result['result']).encode('utf-8'))}")
             json_size = len(json.dumps(action_result["result"]).encode('utf-8'))
-            # 20MB limit
-            if json_size > 20000000:
-                action_result["status"] = "FAILURE"
-                action_result["result"] = json.dumps({"success": False, "reason": "Result too large to send to backend. Size: %d MB. Max: 20MB" % (json_size//(1024*1024))})
+
+            if "shuffler.io" in url or "run.app" in url:
+                # 30MB limit
+                if json_size > 30000000:
+                    action_result["status"] = "FAILURE"
+                    action_result["result"] = json.dumps({
+                        "success": False, 
+                        "reason": "Result too large to send to backend on cloud. Size: %d MB. Max: 30MB" % (json_size//(1024*1024)),
+                        "extra": "Contact support@shuffler.io if you need larger file sizes",
+                    })
         except Exception as e:
             self.logger.info(f"[ERROR] Failed to get size of result: {e}")
 
@@ -755,7 +785,7 @@ class AppBase:
                             headerauth = headers["Authorization"]
 
                         try:
-                            self.logger.info(f"[ERROR] Bad resp ({ret.status_code}) in send_result for url '{url}'. Execution ID: %d, Authorization: %d, Header Auth: %d" % (len(action_result["execution_id"]), len(action_result["authorization"]), len(headerauth)))
+                            self.logger.info(f"[ERROR] Bad resp ({ret.status_code}) in send_result for url '{url}'. Execution ID: %d, Authorization: %d, Header Auth: %d. Raw: %s" % (len(action_result["execution_id"]), len(action_result["authorization"]), len(headerauth), ret.text))
 
                         except Exception as e:
                             self.logger.info(f"[ERROR] Bad resp ({ret.status_code}) in send_result for url '{url}' (no detail)") 
@@ -887,7 +917,7 @@ class AppBase:
                 #value = params[key]
                 for param in self.action["parameters"]:
                     try:
-                        if param["name"] == key and param["unique_toggled"]:
+                        if param["name"] == key and "unique_toggled" in param and param["unique_toggled"]:
                             self.logger.info(f"[DEBUG] FOUND: {key} with param {param}!")
                             if isinstance(value, dict) or isinstance(value, list):
                                 try:
@@ -1142,10 +1172,15 @@ class AppBase:
                 #self.logger.info(f"{value} is not a list")
                 pass
 
-        self.logger.info("[DEBUG] Listlengths: %s - listitems: %d" % (listlengths, len(listitems)))
+        
+        if os.getenv("DEBUG", "").lower() == "true":
+            self.logger.info("[DEBUG] Listlengths: %s - listitems: %d" % (listlengths, len(listitems)))
+
         #if len(listitems) == 0:
         if len(listlengths) == 0:
-            self.logger.info("[DEBUG] NO multiplier. Running a single iteration.")
+            if os.getenv("DEBUG", "").lower() == "true":
+                self.logger.info("[DEBUG] NO multiplier. Running a single iteration.")
+
             paramlist.append(baseparams)
 
         #elif len(listitems) == 1:
@@ -1210,7 +1245,6 @@ class AppBase:
             
 
     # Runs recursed versions with inner loops and such 
-    #async def run_recursed_items(self, func, baseparams, loop_wrapper):
     def run_recursed_items(self, func, baseparams, loop_wrapper):
         #self.logger.info(f"PRE RECURSED ITEMS: {baseparams}")
         has_loop = False
@@ -1397,11 +1431,12 @@ class AppBase:
                 ret.append(new_value)
 
             #self.logger.info("[INFO] Function return length: %d" % len(ret))
-            if len(ret) == 1:
-                #ret = ret[0]
-                self.logger.info("[DEBUG] DONT make list of 1 into 0!!")
+            #if len(ret) == 1:
+            #ret = ret[0]
+            #self.logger.info("[DEBUG] DONT make list of 1 into 0!!")
 
-        self.logger.info(f"[DEBUG][%s] Done with execution recursion %d times" % (self.current_execution_id, len(param_multiplier)))
+        if os.getenv("DEBUG", "").lower() == "true":
+            self.logger.info(f"[DEBUG][%s] Done with execution recursion %d time(s)" % (self.current_execution_id, len(param_multiplier)))
 
         #self.logger.info("Return from execution: %s" % ret)
         if ret == None:
@@ -1859,6 +1894,20 @@ class AppBase:
             except Exception as e:
                 self.logger.info(f"[WARNING] Failed to check if larger than as list: {e}")
 
+            try:
+                if not sourcevalue.isdigit() and destinationvalue.isdigit():
+                    if len(str(sourcevalue)) > int(destinationvalue):
+                        return True
+            except Exception as e:
+                self.logger.info(f"[WARNING] Failed to check if larger than as string: {e}")
+
+            try:
+                if not destinationvalue.isdigit() and sourcevalue.isdigit():
+                    if int(sourcevalue) > len(str(destinationvalue)):
+                        return True
+            except Exception as e:
+                self.logger.info(f"[WARNING] Failed to check if larger than as string: {e}")
+
 
         # FIXME: This will be buggy if using < and <= operators in the future.
         elif check.lower() == "smaller than" or check.lower() == "less than" or check == "<" or check == "<=":
@@ -1883,6 +1932,22 @@ class AppBase:
                     return True
             except Exception as e:
                 self.logger.info(f"[WARNING] Failed to check if smaller than as list: {e}")
+
+            try:
+                if not sourcevalue.isdigit() and destinationvalue.isdigit():
+                    if len(str(sourcevalue)) < int(destinationvalue):
+                        return True
+
+            except Exception as e:
+                self.logger.info(f"[WARNING] Failed to check if smaller than as string: {e}")
+
+            try:
+                if sourcevalue.isdigit() and not destinationvalue.isdigit():
+                    if int(sourcevalue) < len(str(destinationvalue)):
+                        return True
+
+            except Exception as e:
+                self.logger.info(f"[WARNING] Failed to check if smaller than as string: {e}")
 
         elif check.lower() == "re" or check.lower() == "matches regex":
             try:
@@ -2019,6 +2084,9 @@ class AppBase:
             self.send_result(self.action_result, headers, stream_path) 
             return
 
+        if not self.singul:
+            self.init_singul()
+
         # Verify whether there are any parameters with ACTION_RESULT required
         # If found, we get the full results list from backend
 
@@ -2132,7 +2200,7 @@ class AppBase:
                     if param["name"] == "body":
                         contains_body = True
 
-            self.logger.info("[DEBUG][%s] Action name: %s, Params: %d, Has Body: %s" % (self.current_execution_id, self.action["name"], parameter_count, str(contains_body)))
+            self.logger.info("[INFO][%s] Action name: %s, Params: %d, Has Body: %s" % (self.current_execution_id, self.action["name"], parameter_count, str(contains_body)))
         except Exception as e:
             print("[ERROR] Failed in init print handler: %s" % e)
 
@@ -2529,7 +2597,6 @@ class AppBase:
 
                     # Checks specific regex like #1-2 for index 1-2 in a loop
                     elif len(actualitem) > 0:
-
                         is_loop = True
                         newvalue = []
                         firstitem = actualitem[0][0]
@@ -2616,7 +2683,15 @@ class AppBase:
                                             pass
 
                                 except json.decoder.JSONDecodeError as e:
-                                    return str(basejson[value]), False
+                                    if "Expecting value: line 1 column 2" in str(e):
+                                        try:
+                                            self.logger.info(f"[WARNING] Failed to load json object trying different approach")
+                                            obj = ast.literal_eval(basejson[value])
+                                            basejson = obj if isinstance(obj, (dict, list)) else json.loads(json.dumps(obj))
+                                        except:
+                                            return str(basejson[value]), False
+                                    else:
+                                        return str(basejson[value]), False
                             else:
                                 basejson = basejson[value]
                         except KeyError as e:
@@ -3750,7 +3825,7 @@ class AppBase:
                                     # This code handles files.
                                     isfile = False
                                     try:
-                                        if parameter["schema"]["type"] == "file" and len(value) > 0:
+                                        if "schema" in parameter and "type" in parameter["schema"] and parameter["schema"]["type"] == "file" and len(value) > 0:
                                             self.logger.info("(2) SHOULD HANDLE FILE IN MULTI. Get based on value %s" % parameter["value"]) 
 
                                             for tmp_file_split in json.loads(parameter["value"]):
@@ -3760,9 +3835,9 @@ class AppBase:
 
                                             isfile = True
                                     except KeyError as e:
-                                        self.logger.info("(2) SCHEMA ERROR IN FILE HANDLING: %s" % e)
+                                        self.logger.info("[ERROR] (2) SCHEMA ERROR IN FILE HANDLING: %s" % e)
                                     except json.decoder.JSONDecodeError as e:
-                                        self.logger.info("(2) JSON ERROR IN FILE HANDLING: %s" % e)
+                                        self.logger.info("[ERROR] (2) JSON ERROR IN FILE HANDLING: %s" % e)
 
                                     if not isfile:
                                         #tmpitem = tmpitem.replace("\\\\", "\\", -1)
@@ -3807,7 +3882,7 @@ class AppBase:
                                         params[parameter["name"]] = file_value 
                                         multi_parameters[parameter["name"]] = file_value 
                                 except KeyError as e:
-                                    self.logger.info("SCHEMA ERROR IN FILE HANDLING: %s" % e)
+                                    self.logger.info("[ERROR] SCHEMA ERROR IN FILE HANDLING: %s" % e)
 
                             
                         # Fix lists here
@@ -3854,11 +3929,27 @@ class AppBase:
                                 #self.logger.info(f"Error with subparam deletion of {subparam} in {multi_parameters} (2)")
                                 pass
 
-                        #self.logger.info()
-                        #self.logger.info(f"Param: {params}")
-                        #self.logger.info(f"Multiparams: {multi_parameters}")
-                        #self.logger.info()
-                        
+                        if os.getenv("DEBUG", "").lower() == "true":
+
+                            # Used for multi testing
+                            #if not multiexecution:
+                            #    multiexecution = True
+
+                            self.logger.info(f"[DEBUG] Param: {params}")
+                            self.logger.info(f"[DEBUG] Multiparams: {multi_parameters}")
+
+                        timeout = 30 
+                        if "app_name" in self.action and (self.action["app_name"].lower() == "shuffle tools" or self.action["app_name"].lower() == "shuffle subflow"):
+                            timeout = 55
+
+                        timeout_env = os.getenv("SHUFFLE_APP_SDK_TIMEOUT", timeout)
+                        try:
+                            timeout = int(timeout_env)
+                            #self.logger.info(f"[DEBUG] Timeout set to {timeout} seconds")  
+                        except Exception as e:
+                            self.logger.info(f"[ERROR] Failed parsing timeout to int: {e}")
+
+                        # Single exec
                         if not multiexecution:
                             #self.logger.info("NOT MULTI EXEC")
                             # Runs a single iteration here
@@ -3922,22 +4013,12 @@ class AppBase:
                                     # Individual functions shouldn't take longer than this
                                     # This is an attempt to make timeouts occur less, incentivizing users to make use efficient API's
                                     # PS: Not implemented for lists - only single actions as of May 2023
-                                    timeout = 30 
 
                                     # Check if current app is Shuffle Tools, then set to 55 due to certain actions being slow (ioc parser..) 
                                     # In general, this should be disabled for onprem 
-                                    if self.action["app_name"].lower() == "shuffle tools":
-                                        timeout = 55
-
-                                    timeout_env = os.getenv("SHUFFLE_APP_SDK_TIMEOUT", timeout)
-                                    try:
-                                        timeout = int(timeout_env)
-                                        #self.logger.info(f"[DEBUG] Timeout set to {timeout} seconds")  
-                                    except Exception as e:
-                                        self.logger.info(f"[ERROR] Failed parsing timeout to int: {e}")
 
                                     #timeout = 30 
-                                    self.logger.info("[DEBUG][%s] Running function '%s' with timeout %d" % (self.current_execution_id, action["name"], timeout))
+                                    self.logger.info("[INFO][%s] Running function '%s' with timeout %d" % (self.current_execution_id, action["name"], timeout))
 
                                     try:
                                         executor = concurrent.futures.ThreadPoolExecutor()
@@ -4086,14 +4167,42 @@ class AppBase:
                                     self.logger.info("Can't handle type %s value from function" % (type(newres)))
 
                         else:
-                            #self.logger.info("[INFO] APP_SDK DONE: Starting MULTI execution (length: %d) with values %s" % (minlength, multi_parameters))
+                            if os.getenv("DEBUG", "").lower() == "true":
+                                self.logger.info("[DEBUG] APP_SDK DONE: Starting MULTI execution (length: %d) with values %s" % (minlength, multi_parameters))
+
                             # 1. Use number of executions based on the arrays being similar
                             # 2. Find the right value from the parsed multi_params
-
-                            #self.logger.info("[INFO] Running WITH loop. MULTI: %s", multi_parameters)
                             json_object = False
-                            #results = await self.run_recursed_items(func, multi_parameters, {})
-                            results = self.run_recursed_items(func, multi_parameters, {})
+
+                            #if os.getenv("DEBUG", "").lower() != "true":
+                            #    results = self.run_recursed_items(func, multi_parameters, {})
+                            #else:
+                            try:
+                                executor = concurrent.futures.ThreadPoolExecutor()
+                                future = executor.submit(self.run_recursed_items, func, multi_parameters, {})
+                                results = future.result(timeout)
+
+                                if not future.done():
+                                    # The future is still running, so we need to cancel it
+                                    future.cancel()
+                                    results = json.dumps([{
+                                        "success": False,
+                                        "exception": str(e),
+                                        "reason": "Loop Timeout error within %d seconds (1). This happens if we can't reach or use the API you're trying to use within the time limit. Configure SHUFFLE_APP_SDK_TIMEOUT=100 in Orborus to increase it to 100 seconds. Not changeable for cloud." % (timeout),
+                                    }])
+
+                                else:
+                                    # The future is done, so we can just get the result from newres :)
+                                    pass
+
+                            except concurrent.futures.TimeoutError as e:
+                                results = json.dumps([{
+                                    "success": False,
+                                    "reason": "Loop Timeout error (2) within %d seconds (2). This happens if we can't reach or use the API you're trying to use within the time limit. Configure SHUFFLE_APP_SDK_TIMEOUT=100 in Orborus to increase it to 100 seconds. Not changeable for cloud." % (timeout),
+                                }])
+
+
+
                             if isinstance(results, dict) or isinstance(results, list):
                                 json_object = True
 
@@ -4130,7 +4239,7 @@ class AppBase:
                                     result = result[:-2]
                                     result += "]"
                             else:
-                                self.logger.info("Normal result - no list?")
+                                #self.logger.info("Normal result - no list?")
                                 result = results
 
                     if self.authorization == "standalone": 
@@ -4188,7 +4297,8 @@ class AppBase:
 
         except Exception as e:
             self.logger.info(f"[ERROR] Failed to execute: {e}")
-            self.logger.exception(f"[ERROR] Failed to execute {e}-{action['id']}")
+            if "id" in action:
+                self.logger.exception(f"[ERROR] Failed to execute {e}-{action['id']}")
             self.action_result["status"] = "FAILURE" 
             try:
                 e = json.loads(f"{e}")
@@ -4258,7 +4368,6 @@ class AppBase:
                         }
         
                     # Remaking class for each request
-        
                     app = cls(redis=None, logger=logger, console_logger=logger)
                     extra_info = ""
                     try:
@@ -4291,17 +4400,6 @@ class AppBase:
                             app.base_url = requestdata["base_url"]
                         except Exception as e:
                             extra_info += f"\n{e}"
-
-                        # Singul API
-                        try:
-                            if app.singul == None:
-                                app.singul = Singul(
-                                    auth=requestdata["workflow_execution"]["authorization"],
-                                    url=requestdata["url"],
-                                    execution_id=requestdata["workflow_execution"]["execution_id"],
-                                )
-                        except Exception as e:
-                            print("[ERROR] Failed to create Singul instance: %s" % e)
                         
                         #await 
                         app.execute_action(app.action)
