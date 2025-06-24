@@ -2023,9 +2023,9 @@ class AppBase:
 
                 "app_name": ""
             }
+
             self.authorization = "standalone"
             self.current_execution_id = "standalone"
-
             for key in unknown_args:
                 if "=" not in key:
                     if "standalone" not in key:
@@ -2040,6 +2040,10 @@ class AppBase:
                     namesplit = keysplit[0].split("--")
                     if len(namesplit) == 2:
                         newkey = namesplit[1]
+
+                    # Remove quotes before/after
+                    if newkey.startswith("'") and newkey.endswith("'"):
+                        newkey = newkey[1:-1]
 
                     self.action["parameters"].append({
                         "name": newkey,
@@ -3910,7 +3914,6 @@ class AppBase:
                             # Used for multi testing
                             #if not multiexecution:
                             #    multiexecution = True
-
                             self.logger.info(f"[DEBUG] Param: {params}")
                             self.logger.info(f"[DEBUG] Multiparams: {multi_parameters}")
 
@@ -4420,7 +4423,7 @@ class AppBase:
         else:
             # Has to start like this due to imports in other apps
             # Move it outside everything?
-            print("Running app without webserver")
+            #print("Running app without webserver")
             app = cls(redis=None, logger=logger, console_logger=logger)
             
             if isinstance(action, str):
