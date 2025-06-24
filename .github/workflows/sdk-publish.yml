@@ -4,6 +4,7 @@ name: Upload App SDK to PiPy
 # This makes it work with trusted publishers.
 
 on:
+  workflow_dispatch:
   release:
     types: [published]
   push:
