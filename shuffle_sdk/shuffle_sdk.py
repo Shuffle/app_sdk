@@ -1649,6 +1649,9 @@ class AppBase:
     def set_key(self, key, value, category=""):
         return self.set_cache(key, value, category=category)
 
+    def set_datastore_key(self, key, value, category=""):
+        return self.set_cache(key, value, category=category)
+
     def set_cache(self, key, value, category=""):
         org_id = self.full_execution["workflow"]["execution_org"]["id"]
         url = "%s/api/v1/orgs/%s/set_cache" % (self.url, org_id)
@@ -1689,6 +1692,9 @@ class AppBase:
             return {"success": False}
 
     def get_key(self, key, category=""):
+        return self.get_cache(key, category=category)
+
+    def get_datastore_key(self, key, category=""):
         return self.get_cache(key, category=category)
 
     def get_cache(self, key, category=""):
