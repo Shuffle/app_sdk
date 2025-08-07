@@ -2,11 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='shuffle_sdk',  
-<<<<<<< HEAD
-    version='0.0.26',  
-=======
-    version='0.0.27',  
->>>>>>> 1baf0c282aa010acda59502e2158437dda8637a2
+    version='0.0.28',  
     description='The SDK used for Shuffle',  
     py_modules=["shuffle_sdk"],  
     license='MIT',
