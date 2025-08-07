@@ -1657,7 +1657,7 @@ class AppBase:
             "execution_id": self.current_execution_id,
             "authorization": self.authorization,
             "org_id": org_id,
-            "key": key,
+            "key": str(key),
             "value": str(value),
         }
 
@@ -1699,7 +1699,7 @@ class AppBase:
             "execution_id": self.current_execution_id,
             "authorization": self.authorization,
             "org_id": org_id,
-            "key": key,
+            "key": str(key),
         }
 
         if category:
