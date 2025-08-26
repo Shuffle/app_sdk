@@ -33,6 +33,8 @@ requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 
 runtime = os.getenv("SHUFFLE_SWARM_CONFIG", "")
+if runtime == "swarm":
+    runtime = "run"
 
 ###
 ###
