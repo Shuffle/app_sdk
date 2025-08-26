@@ -360,6 +360,7 @@ class AppBase:
         self.full_execution = os.getenv("FULL_EXECUTION", "") 
         self.result_wrapper_count = 0
         self.singul = None
+        self.standalone = False 
 
         # Make start time with milliseconds
         self.start_time = int(time.time_ns())
@@ -2047,6 +2048,7 @@ class AppBase:
                 "app_name": ""
             }
 
+            self.standalone = True
             self.authorization = "standalone"
             self.current_execution_id = "standalone"
             for key in unknown_args:
@@ -2067,6 +2069,17 @@ class AppBase:
                     # Remove quotes before/after
                     if newkey.startswith("'") and newkey.endswith("'"):
                         newkey = newkey[1:-1]
+
+                    if newkey == "shuffle_authorization":
+                        self.authorization = keysplit[1]
+                        continue
+                    elif newkey == "shuffle_execution_id" or newkey == "shuffle_executionid":
+                        self.current_execution_id = keysplit[1]
+                        continue
+                    elif newkey == "shuffle_url":
+                        self.url = keysplit[1]
+                        self.base_url = self.url
+                        continue
 
                     self.action["parameters"].append({
                         "name": newkey,
@@ -2102,9 +2115,16 @@ class AppBase:
 
         # Forcing this to run due to potential self.full_execution loading issues in cloud run
         fullexecution = {}
+        if self.standalone == True:
+            fullexecution = {
+                "workflow": {
+                    "id": "STANDALONE",
+                    "execution_org": {
+                        "id": "STANDALONE"
+                    }
+                }
+            }
 
-        if self.authorization == "standalone": 
-            pass
         elif True or (isinstance(self.full_execution, str) and len(self.full_execution) == 0):
             #self.logger.info("[DEBUG] NO EXECUTION - LOADING!")
             try:
@@ -2190,7 +2210,6 @@ class AppBase:
 
 
         self.full_execution = fullexecution
-
         found_id = ""
         try:
             if "execution_id" in self.full_execution and len(self.full_execution["execution_id"]) > 0:
@@ -2198,7 +2217,7 @@ class AppBase:
             elif len(self.current_execution_id) > 0:
                 found_id = self.current_execution_id
         except Exception as e:
-            print("[ERROR] Failed in get full exec")
+            print(f"[ERROR] Failed in get full exec: {e}")
                 
         try:
             contains_body = False
@@ -2212,7 +2231,7 @@ class AppBase:
 
             self.logger.info("[INFO][%s] Action name: %s, Params: %d, Has Body: %s" % (self.current_execution_id, self.action["name"], parameter_count, str(contains_body)))
         except Exception as e:
-            print("[ERROR] Failed in init print handler: %s" % e)
+            print(f"[ERROR] Failed in init print handler: {e}") 
 
         try:
             if replace_params == True:
@@ -3609,7 +3628,7 @@ class AppBase:
             func = getattr(self, actionname, None)
             if func == None:
                 self.logger.debug(f"[DEBUG] Failed executing {actionname} because func is None (no function / wrong action name).")
-                if self.authorization == "standalone": 
+                if self.standalone or self.authorization == "standalone": 
                     exit()
 
                 self.action_result["status"] = "FAILURE" 
@@ -4040,7 +4059,7 @@ class AppBase:
                                             newres = json.dumps({
                                                 "success": False,
                                                 "exception": str(e),
-                                                "reason": "Timeout error within %d seconds (1). This happens if we can't reach or use the API you're trying to use within the time limit. Configure SHUFFLE_APP_SDK_TIMEOUT=100 in Orborus to increase it to 100 seconds. Not changeable for cloud." % timeout,
+                                                "reason": "Timeout error within %d seconds (1). This happens if we can't reach or use the API you're trying to use within the time limit. Configure SHUFFLE_APP_SDK_TIMEOUT=100 in Orborus to increase it to 100 seconds. If you want to change this for cloud-hosted apps, contact support@shuffler.io." % timeout,
                                             })
 
                                         else:
@@ -4251,7 +4270,7 @@ class AppBase:
                                 #self.logger.info("Normal result - no list?")
                                 result = results
 
-                    if self.authorization == "standalone": 
+                    if self.standalone or self.authorization == "standalone": 
                         print("\n\n===== Successful result From the Function =====\n\n%s" % result)
                         exit()
 
@@ -4264,7 +4283,7 @@ class AppBase:
                     #self.logger.debug(f"Data: %s" % action_result)
                 except TypeError as e:
                     self.logger.info("[ERROR] TypeError issue: %s" % e)
-                    if self.authorization == "standalone": 
+                    if self.standalone or self.authorization == "standalone": 
                         exit()
 
                     self.action_result["status"] = "FAILURE" 
@@ -4349,7 +4368,8 @@ class AppBase:
 
         exposed_port = os.getenv("SHUFFLE_APP_EXPOSED_PORT", "")
         #logger.info(f"[DEBUG] \"{runtime}\" - run indicates microservices. Port: \"{exposed_port}\"")
-        if runtime == "run" and exposed_port != "":
+
+        if runtime == "run" and exposed_port != "": 
             # Base port is 33334. Exposed port may differ based on discovery from Worker
             port = int(exposed_port)
             #logger.info(f"[DEBUG] Starting webserver on port {port} (same as exposed port)")
