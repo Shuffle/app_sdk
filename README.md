@@ -35,7 +35,7 @@ With the above function as an example
 python3 app.py --standalone --action=sample_function paramname=World
 ```
 
-**PS: The following parameters are reserved, allowing you to set proper variables for testing such as local backends:**
+**NOT REQUIRED: These are reserved parameters, allowing you to set variables for testing such as local backends to upload into Shuffle during tests:**
 ```
 --shuffle_url="http://custom_backend_url"
 --shuffle_authorization="auth"
