@@ -1661,8 +1661,7 @@ class AppBase:
             "success": resp.status_code == 200,
             "status": resp.status_code,
             "url": url,
-            "details": "Execution Auth is not implemented for this action yet. Please use the API directly." 
-
+            "details": "Execution Auth is not implemented for this action yet. Please use the API directly.",
             "body": resp.text,
         }
 
@@ -4480,14 +4479,48 @@ class AppBase:
             #    pass
 
             # Can run channel_timeout low because socket closes, BUT thread stays open
+
+            threads = 8
+            backlog = 2048
+            channel_timeout = 2
+            connection_limit = 1000
+
+            found_threads = os.getenv("SHUFFLE_APP_SDK_WAITRESS_THREADS", "")
+            found_backlog = os.getenv("SHUFFLE_APP_SDK_WAITRESS_BACKLOG", "")
+            found_channel_timeout = os.getenv("SHUFFLE_APP_SDK_WAITRESS_CHANNEL_TIMEOUT", "")
+            found_connection_limit = os.getenv("SHUFFLE_APP_SDK_WAITRESS_CONNECTION_LIMIT", "")
+            if len(found_threads) > 0:
+                try:
+                    threads = int(found_threads)
+                except Exception as e:
+                    logger.info(f"[WARNING] Failed parsing SHUFFLE_APP_SDK_WAITRESS_THREADS: {e}")
+
+            if len(found_backlog) > 0:
+                try:
+                    backlog = int(found_backlog)
+                except Exception as e:
+                    logger.info(f"[WARNING] Failed parsing SHUFFLE_APP_SDK_WAITRESS_BACKLOG: {e}")
+
+            if len(found_channel_timeout) > 0:
+                try:
+                    channel_timeout = int(found_channel_timeout)
+                except Exception as e:
+                    logger.info(f"[WARNING] Failed parsing SHUFFLE_APP_SDK_WAITRESS_CHANNEL_TIMEOUT: {e}")
+
+            if len(found_connection_limit) > 0:
+                try:
+                    connection_limit = int(found_connection_limit)
+                except Exception as e:
+                    logger.info(f"[WARNING] Failed parsing SHUFFLE_APP_SDK_WAITRESS_CONNECTION_LIMIT: {e}")
+
             serve(
                 flask_app, 
                 host="0.0.0.0", 
                 port=port, 
-                threads=8,
-                backlog=2048,
-                channel_timeout=2,
-                connection_limit=1000,
+                threads=threads,
+                backlog=backlog,
+                channel_timeout=channel_timeout,
+                connection_limit=connection_limit,
                 expose_tracebacks=True,
                 asyncore_use_poll=True,
             )
