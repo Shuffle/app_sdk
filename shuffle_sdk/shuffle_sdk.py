@@ -1649,6 +1649,23 @@ class AppBase:
             #return response.json()
             return json.dumps({"success": False, "reason": f"Failed to delete cache for key '{key}'"})
 
+    def list_category(self, category, items=50):
+
+        if len(category) == 0:
+            return {"success": False, "reason": "Category can't be empty"}
+
+        org_id = self.full_execution["workflow"]["execution_org"]["id"]
+        url = "%s/api/v2/datastore?category=%s&top=%d" % (self.url, category, items)
+        resp = requests.get(url, verify=False, proxies=self.proxy_config)
+        return {
+            "success": resp.status_code == 200,
+            "status": resp.status_code,
+            "url": url,
+            "details": "Execution Auth is not implemented for this action yet. Please use the API directly." 
+
+            "body": resp.text,
+        }
+
     def set_key(self, key, value, category=""):
         return self.set_cache(key, value, category=category)
 
@@ -3973,11 +3990,12 @@ class AppBase:
                             timeout = 55
 
                         timeout_env = os.getenv("SHUFFLE_APP_SDK_TIMEOUT", timeout)
-                        try:
-                            timeout = int(timeout_env)
-                            #self.logger.info(f"[DEBUG] Timeout set to {timeout} seconds")  
-                        except Exception as e:
-                            self.logger.info(f"[ERROR] Failed parsing timeout to int: {e}")
+                        if len(timeout_env) > 0:
+                            try:
+                                timeout = int(timeout_env)
+                                #self.logger.info(f"[DEBUG] Timeout set to {timeout} seconds")  
+                            except Exception as e:
+                                self.logger.info(f"[ERROR] Failed parsing timeout to int: {e}")
 
                         # Single exec
                         if not multiexecution:
@@ -4454,20 +4472,22 @@ class AppBase:
         
             logger.info(f"[DEBUG] Serving on port {port}")
 
-            #flask_app.run(
-            #    host="0.0.0.0", 
-            #    port=port, 
-            #    threaded=True, 
-            #    processes=1, 
-            #    debug=False,
-            #)
+            #timeout = 30 
+            #timeout_env = os.getenv("SHUFFLE_APP_SDK_TIMEOUT", timeout)
+            #try:
+            #    timeout = int(timeout_env)
+            #except Exception as e:
+            #    pass
 
+            # Can run channel_timeout low because socket closes, BUT thread stays open
             serve(
                 flask_app, 
                 host="0.0.0.0", 
                 port=port, 
                 threads=8,
-                channel_timeout=30,
+                backlog=2048,
+                channel_timeout=2,
+                connection_limit=1000,
                 expose_tracebacks=True,
                 asyncore_use_poll=True,
             )
