@@ -1996,7 +1996,7 @@ class AppBase:
         self.action = copy.deepcopy(action)
 
         headers = {
-            "Content-Type": "application/json",     
+            "Content-Type": "application/json",
             "Authorization": f"Bearer {self.authorization}",
             "User-Agent": "Shuffle 1.1.0",
         }
@@ -4369,10 +4369,17 @@ class AppBase:
                             "success": False,
                             "reason": f"Invalid Action data {e}",
                         }
-        
+                    extra_info = ""
+
+                    try:
+                        os.environ["EXECUTIONID"] = requestdata["execution_id"]
+                        os.environ["ACTION"] = requestdata["action"]
+                    except Exception as e:
+                        extra_info += f"\n{e}"
+
                     # Remaking class for each request
                     app = cls(redis=None, logger=logger, console_logger=logger)
-                    extra_info = ""
+
                     try:
                         #asyncio.run(AppBase.run(action=requestdata), debug=True)
                         #value = json.dumps(value)
