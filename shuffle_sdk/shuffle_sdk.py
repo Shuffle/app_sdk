@@ -330,8 +330,6 @@ def url_decode(base):
 ###
 ###
 
-pastAppExecutions = []
-
 class AppBase:
     __version__ = None
     app_name = None
@@ -366,21 +364,6 @@ class AppBase:
 
         # Make start time with milliseconds
         self.start_time = int(time.time_ns())
-        try:
-            if isinstance(self.action, str):
-                self.action = json.loads(self.action)
-
-            action_id = self.action.get("id")
-            fullKey = str(self.current_execution_id) + "-" + str(action_id)
-            if fullKey in pastAppExecutions:
-                self.logger.error(f"[ERROR] Duplicate execution detected for execution id - {self.current_execution_id} and action - {str(action_id)}")
-                return
-
-            pastAppExecutions.append(fullKey)
-            if len(pastAppExecutions) > 50:
-                pastAppExecutions[:] = pastAppExecutions[-50:]
-        except Exception as e:
-            self.logger.info(f"[ERROR] Failed to access action ID in the execution({self.current_execution_id}): {e}")
 
         self.init_singul()
 
@@ -4414,16 +4397,10 @@ class AppBase:
                             "success": False,
                             "reason": f"Invalid Action data {e}",
                         }
-                    extra_info = ""
-
-                    try:
-                        os.environ["EXECUTIONID"] = requestdata["execution_id"]
-                        os.environ["ACTION"] = requestdata["action"]
-                    except Exception as e:
-                        extra_info += f"\n{e}"
 
                     # Remaking class for each request
                     app = cls(redis=None, logger=logger, console_logger=logger)
+                    extra_info = ""
 
                     try:
                         #asyncio.run(AppBase.run(action=requestdata), debug=True)
