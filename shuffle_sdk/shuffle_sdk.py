@@ -3971,7 +3971,7 @@ class AppBase:
                         if "app_name" in self.action and (self.action["app_name"].lower() == "shuffle tools" or self.action["app_name"].lower() == "shuffle subflow"):
                             timeout = 55
 
-                        timeout_env = os.getenv("SHUFFLE_APP_SDK_TIMEOUT", timeout)
+                        timeout_env = os.getenv("SHUFFLE_APP_SDK_TIMEOUT", "")
                         if len(timeout_env) > 0:
                             try:
                                 timeout = int(timeout_env)
