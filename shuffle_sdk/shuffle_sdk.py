@@ -1524,7 +1524,7 @@ class AppBase:
     # Things to consider for files:
     # - How can you download / stream a file? 
     # - Can you decide if you want a stream or the files directly?
-    def get_file(self, value):
+    def get_file(self, value, category=""):
         full_execution = self.full_execution
         org_id = full_execution["workflow"]["execution_org"]["id"]
 
@@ -1805,6 +1805,18 @@ class AppBase:
                 self.logger.info(f"KeyError in file setup: {e}")
                 pass
 
+            try:
+                data["namespace"] = curfile["namespace"]
+            except KeyError as e:
+                #self.logger.info(f"KeyError in file setup for namespace: {e}")
+                pass
+
+            try:
+                data["namespace"] = curfile["category"]
+            except KeyError as e:
+                #self.logger.info(f"KeyError in file setup for category: {e}")
+                pass
+
             ret = requests.post("%s%s" % (self.url, create_path), headers=headers, json=data, verify=False, proxies=self.proxy_config)
             #self.logger.info(f"Ret CREATE: {ret.text}")
             cur_id = ""
@@ -2070,6 +2082,8 @@ class AppBase:
                     # Remove quotes before/after
                     if newkey.startswith("'") and newkey.endswith("'"):
                         newkey = newkey[1:-1]
+
+                    print("KEY: %s" % newkey)
 
                     if newkey == "shuffle_authorization":
                         self.authorization = keysplit[1]
