@@ -411,7 +411,6 @@ class AppBase:
         if len(self.base_url) == 0:
             self.base_url = self.url
 
-
         self.local_storage = []
 
     def init_singul(self):
@@ -2030,7 +2029,7 @@ class AppBase:
                     shouldExit = False
 
             if shouldExit:
-                self.logger.info("[WARNING] ACTION env not defined. Checking if ran manually")
+                self.logger.info("[WARNING] ACTION env not defined (1). Checking if ran manually")
                 self.action_result["result"] = "Error in setup ENV: ACTION not defined. Use 'python3 shuffle_sdk.py standalone --action=action' to run standalone"
                 self.send_result(self.action_result, headers, stream_path) 
                 return
@@ -2111,13 +2110,13 @@ class AppBase:
             action = self.action
 
         if len(self.authorization) == 0:
-            self.logger.info("[WARING] AUTHORIZATION env not defined")
+            self.logger.info("[WARING] AUTHORIZATION env not defined (2)")
             self.action_result["result"] = "Error in setup ENV: AUTHORIZATION not defined"
             self.send_result(self.action_result, headers, stream_path) 
             return
 
         if len(self.current_execution_id) == 0:
-            self.logger.info("[WARNING] EXECUTIONID env not defined")
+            self.logger.info("[WARNING] EXECUTIONID env not defined (3)")
             self.action_result["result"] = "Error in setup ENV: EXECUTIONID not defined"
             self.send_result(self.action_result, headers, stream_path) 
             return
@@ -3171,9 +3170,9 @@ class AppBase:
 
             return template
 
-        # Suboptimal cleanup script for BOdy parsing of OpenAPI
+        # Suboptimal cleanup script for Body parsing of OpenAPI
         # Should have a regex which looks for the value, then goes out and cleans up the key
-        def recurse_cleanup_script(data):
+        def recurse_cleanup_script_old(data):
             deletekeys = []
             newvalue = data
             try:
@@ -3201,7 +3200,7 @@ class AppBase:
                         continue
         
                     if isinstance(value, dict):
-                        newvalue[key] = recurse_cleanup_script(value)
+                        newvalue[key] = recurse_cleanup_script_old(value)
         
             except json.decoder.JSONDecodeError as e:
                 # Since here the data isn't at all JSON compatible..?
@@ -3246,6 +3245,99 @@ class AppBase:
         
             return data 
 
+
+        def recurse_cleanup_script(data):
+            deletekeys = []
+        
+            # TRACKING: specific fix to ensure Output Type == Input Type
+            input_was_string = False
+        
+            # 1. SETUP: Ensure we are working with a Dict/List object
+            try:
+                if isinstance(data, str):
+                    input_was_string = True
+                    newvalue = json.loads(data)
+                else:
+                    newvalue = data
+            except Exception:
+                # If we can't parse it, return as is (original behavior)
+                return data
+        
+            # 2. MAIN LOOP: Iterate over the dictionary
+            # We wrap in list() to avoid runtime errors if we modify keys during iteration
+            if isinstance(newvalue, dict):
+                for key, value in list(newvalue.items()):
+        
+                    # --- CHECK: Empty Strings ---
+                    if isinstance(value, str) and len(value) == 0:
+                        deletekeys.append(key)
+                        continue
+        
+                    # --- CHECK: Lists (FIXED) ---
+                    # ORIGINAL BUG: It used to json.dumps(list), turning it into a string.
+                    # FIX: We iterate the list items instead.
+                    if isinstance(value, list):
+                        cleaned_list = []
+                        for item in value:
+                            # If the item is a dict, recurse into it
+                            if isinstance(item, dict):
+                                cleaned_item = recurse_cleanup_script(item)
+                                # Only add it back if it's not empty (optional, matches your aggressive cleanup style)
+                                if cleaned_item:
+                                    cleaned_list.append(cleaned_item)
+                            # If it's a string, run the specific bad-var checks
+                            elif isinstance(item, str):
+                                # Logic from your original script:
+                                if "${" in item and "}" in item:
+                                    continue # Skip this bad item (delete it), but keep the list
+                                if len(item) == 0:
+                                    continue
+                                cleaned_list.append(item)
+                            else:
+                                cleaned_list.append(item)
+        
+                        newvalue[key] = cleaned_list
+                        continue
+        
+                    # --- CHECK: Strings with Variables ---
+                    # (Matches your original logic, but ensures we only check actual strings)
+                    if isinstance(value, str):
+                        if value == "${%s}" % key:
+                            deletekeys.append(key)
+                            continue
+                        elif "${" in value and "}" in value:
+                            deletekeys.append(key)
+                            continue
+        
+                    # --- CHECK: Recursion (FIXED) ---
+                    if isinstance(value, dict):
+                        # FIX: We do NOT json.dumps here. We keep it as an object.
+                        child_result = recurse_cleanup_script(value)
+        
+                        # If child became empty after cleanup, we might want to delete the key
+                        if not child_result:
+                            deletekeys.append(key)
+                        else:
+                            newvalue[key] = child_result
+        
+            # 3. DELETE KEYS
+            for deletekey in deletekeys:
+                try:
+                    del newvalue[deletekey]
+                except:
+                    pass
+        
+            # 4. FINAL RETURN (FIXED)
+            # Only convert back to JSON string if the INPUT was a string.
+            if input_was_string:
+                try:
+                    return json.dumps(newvalue)
+                except:
+                    return newvalue
+            else:
+                return newvalue
+        
+
         # Parses parameters sent to it and returns whether it did it successfully with the values found
         def parse_params(action, fullexecution, parameter, self):
             # Skip if it starts with $?
@@ -3269,8 +3361,8 @@ class AppBase:
             #self.logger.info("Input value: %s" % parameter["value"])
             try:
                 parameter["value"] = parameter["value"].replace(escaped_dollar, escape_replacement, -1)
-            except:
-                self.logger.info("Error in initial replacement of escaped dollar!")
+            except Exception as e:
+                self.logger.info(f"Error in initial replacement of escaped dollar: {e}")
 
             paramname = ""
             try:
@@ -3739,6 +3831,7 @@ class AppBase:
                                     self.logger.info("KeyError body OpenAPI: %s" % e)
                                     pass
 
+                                # Headache.
                                 action["parameters"][counter]["value"] = recurse_cleanup_script(action["parameters"][counter]["value"])
 
                         # This seems redundant now 
