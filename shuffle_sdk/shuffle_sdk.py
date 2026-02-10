@@ -3170,89 +3170,11 @@ class AppBase:
 
             return template
 
-        # Suboptimal cleanup script for Body parsing of OpenAPI
-        # Should have a regex which looks for the value, then goes out and cleans up the key
-        def recurse_cleanup_script_old(data):
-            deletekeys = []
-            newvalue = data
-            try:
-                if not isinstance(data, dict):
-                    newvalue = json.loads(data)
-                else:
-                    newvalue = data
-        
-                for key, value in newvalue.items():
-                    if isinstance(value, str) and len(value) == 0:
-                        deletekeys.append(key)
-                        continue
-                            
-                    if isinstance(value, list):
-                        try:
-                            value = json.dumps(value)
-                        except:
-                            pass
-        
-                    if value == "${%s}" % key:
-                        deletekeys.append(key)
-                        continue
-                    elif "${" in value and "}" in value:
-                        deletekeys.append(key)
-                        continue
-        
-                    if isinstance(value, dict):
-                        newvalue[key] = recurse_cleanup_script_old(value)
-        
-            except json.decoder.JSONDecodeError as e:
-                # Since here the data isn't at all JSON compatible..?
-                # Seems to happen with newlines in variables being parsed in as strings?
-                pass
-            except Exception as e:
-                pass
-                
-            try:
-                for deletekey in deletekeys:
-                    try:
-                        del newvalue[deletekey]
-                    except:
-                        pass
-            except Exception as e:
-                return data
-        
-            try:
-                for key, value in newvalue.items():
-                    if isinstance(value, bool):
-                        continue
-                    elif isinstance(value, dict) and not bool(value):
-                        continue
-        
-                    try:
-                        value = json.loads(value)
-                        newvalue[key] = value
-                    except json.decoder.JSONDecodeError as e:
-                        continue
-                    except Exception as e:
-                        continue
-        
-                try:
-                    data = json.dumps(newvalue)
-                except json.decoder.JSONDecodeError as e:
-                    data = newvalue
-        
-            except json.decoder.JSONDecodeError as e:
-                pass
-            except Exception as e:
-                pass
-        
-            return data 
-
-
         def recurse_cleanup_script(data):
             deletekeys = []
-        
-            # TRACKING: specific fix to ensure Output Type == Input Type
+            
+            # Maintain input type (if it came in as a string, return a string)
             input_was_string = False
-        
-            # 1. SETUP: Ensure we are working with a Dict/List object
             try:
                 if isinstance(data, str):
                     input_was_string = True
@@ -3260,75 +3182,66 @@ class AppBase:
                 else:
                     newvalue = data
             except Exception:
-                # If we can't parse it, return as is (original behavior)
+                # If it's a raw string that can't be parsed, return it as is
                 return data
         
-            # 2. MAIN LOOP: Iterate over the dictionary
-            # We wrap in list() to avoid runtime errors if we modify keys during iteration
             if isinstance(newvalue, dict):
+                # Use list(items) to safely modify the dict while iterating
                 for key, value in list(newvalue.items()):
-        
-                    # --- CHECK: Empty Strings ---
+                    
+                    # 1. Clean Empty Strings
                     if isinstance(value, str) and len(value) == 0:
                         deletekeys.append(key)
                         continue
-        
-                    # --- CHECK: Lists (FIXED) ---
-                    # ORIGINAL BUG: It used to json.dumps(list), turning it into a string.
-                    # FIX: We iterate the list items instead.
+                    
+                    # 2. Handle Lists (FIXED: Don't convert to string!)
                     if isinstance(value, list):
+                        # We rebuild the list, keeping only valid items
                         cleaned_list = []
                         for item in value:
-                            # If the item is a dict, recurse into it
-                            if isinstance(item, dict):
+                            if isinstance(item, (dict, list)):
+                                # Recurse into complex items
                                 cleaned_item = recurse_cleanup_script(item)
-                                # Only add it back if it's not empty (optional, matches your aggressive cleanup style)
-                                if cleaned_item:
+                                # Keep it if it's not empty (or keep it regardless if you prefer)
+                                if cleaned_item: 
                                     cleaned_list.append(cleaned_item)
-                            # If it's a string, run the specific bad-var checks
                             elif isinstance(item, str):
-                                # Logic from your original script:
-                                if "${" in item and "}" in item:
-                                    continue # Skip this bad item (delete it), but keep the list
-                                if len(item) == 0:
+                                # Apply the SAME strict check to list items
+                                # Only skip if it is purely a variable placeholder
+                                if item.strip().startswith("${") and item.strip().endswith("}"):
                                     continue
                                 cleaned_list.append(item)
                             else:
                                 cleaned_list.append(item)
-        
+                        
                         newvalue[key] = cleaned_list
                         continue
         
-                    # --- CHECK: Strings with Variables ---
-                    # (Matches your original logic, but ensures we only check actual strings)
+                    # 3. Handle Strings (THE FIX FOR YOUR TEXT BLOCK)
                     if isinstance(value, str):
-                        if value == "${%s}" % key:
-                            deletekeys.append(key)
-                            continue
-                        elif "${" in value and "}" in value:
-                            deletekeys.append(key)
-                            continue
-        
-                    # --- CHECK: Recursion (FIXED) ---
+                        # ORIGINAL BUG WAS HERE: 'if "${" in value...'
+                        # NEW LOGIC: Only delete if the string IS strictly a placeholder.
+                        # It must start with ${ and end with } to be deleted.
+                        stripped_val = value.strip()
+                        if stripped_val.startswith("${") and stripped_val.endswith("}"):
+                            # Double check it doesn't have newlines (your text block had newlines)
+                            # Variables usually don't have newlines.
+                            if "\n" not in stripped_val: 
+                                deletekeys.append(key)
+                                continue
+                    
+                    # 4. Handle Nested Dicts
                     if isinstance(value, dict):
-                        # FIX: We do NOT json.dumps here. We keep it as an object.
-                        child_result = recurse_cleanup_script(value)
+                        newvalue[key] = recurse_cleanup_script(value)
         
-                        # If child became empty after cleanup, we might want to delete the key
-                        if not child_result:
-                            deletekeys.append(key)
-                        else:
-                            newvalue[key] = child_result
-        
-            # 3. DELETE KEYS
+            # Clean up marked keys
             for deletekey in deletekeys:
                 try:
                     del newvalue[deletekey]
                 except:
                     pass
         
-            # 4. FINAL RETURN (FIXED)
-            # Only convert back to JSON string if the INPUT was a string.
+            # Return same type as input
             if input_was_string:
                 try:
                     return json.dumps(newvalue)
