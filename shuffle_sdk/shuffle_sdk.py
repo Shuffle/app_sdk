@@ -22,6 +22,9 @@ import datetime
 import dateutil
 import threading
 import concurrent.futures
+import textwrap
+import subprocess
+import inspect
 from shufflepy import Singul
 
 from io import StringIO as StringBuffer, BytesIO 
@@ -322,6 +325,88 @@ def url_decode(base):
     return unquote_plus(base)
 
 
+def run_user_function_isolated(func, args=None, kwargs=None, allowed_methods=None, timeout=5):
+    """
+    Runs a user function safely in a subprocess with controlled access to allowed_methods.
+
+    :param func: The user function object to run
+    :param args: Positional arguments for func
+    :param kwargs: Keyword arguments for func
+    :param allowed_methods: Dict of method names -> implementations for the 'api' object
+    :param timeout: Execution timeout in seconds
+    :return: Result from func
+    """
+    args = args or []
+    kwargs = kwargs or {}
+    allowed_methods = allowed_methods or {}
+
+    # Get the source of the function
+    func_source = inspect.getsource(func)
+    func_source = textwrap.dedent(func_source)
+
+    # Rewrite AST: replace self.* with api.*
+    tree = ast.parse(func_source)
+
+    class SelfToApiTransformer(ast.NodeTransformer):
+        def visit_Attribute(self, node):
+            # Only rewrite self.* references
+            if isinstance(node.value, ast.Name) and node.value.id == "self":
+                node.value.id = "api"
+            return node
+
+    tree = SelfToApiTransformer().visit(tree)
+    ast.fix_missing_locations(tree)
+    # Compile back to source string
+    rewritten_func_source = compile(tree, filename="<ast>", mode="exec")
+
+    # Prepare payload for subprocess
+    payload = json.dumps({
+        "func_source": func_source,
+        "args": args,
+        "kwargs": kwargs,
+        "allowed_methods": allowed_methods
+    })
+
+    # Subprocess code as inline Python
+    subprocess_code = f"""
+import sys, json
+
+data = json.load(sys.stdin)
+
+# Build restricted api object
+class API:
+    def __init__(self):
+        allowed = data.get("allowed_methods", {{}})
+        for name, code in allowed.items():
+            # Define each allowed method dynamically
+            exec(code, {{}}, locals())
+            setattr(self, name, locals()[name])
+
+api = API()
+
+# Define and run user function safely
+exec(data["func_source"], {{"__builtins__": {{}}, "api": api}}, locals())
+result = locals()[{json.dumps(func.__name__)}](*data["args"], **data["kwargs"])
+print(json.dumps(result))
+"""
+
+    # Run subprocess
+    try:
+        result = subprocess.run(
+            ["python3", "-c", subprocess_code],
+            input=payload,
+            text=True,
+            capture_output=True,
+            cwd="/tmp",
+            env={"PATH": "/usr/bin"},
+            timeout=timeout
+        )
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr)
+        return json.loads(result.stdout)
+    except subprocess.TimeoutExpired:
+        raise TimeoutError(f"User function exceeded timeout of {timeout} seconds")
+
 ###
 ###
 ###
@@ -337,6 +422,7 @@ class AppBase:
     def __init__(self, redis=None, logger=None, console_logger=None):#, docker_client=None):
         self.logger = logger if logger is not None else logging.getLogger("AppBaseLogger")
         global pastAppExecutions
+        global safe_run_inline
 
         if not os.getenv("SHUFFLE_LOGS_DISABLED") == "true":
             self.log_capture_string = StringBuffer()
@@ -4072,7 +4158,24 @@ class AppBase:
 
                                     try:
                                         executor = concurrent.futures.ThreadPoolExecutor()
-                                        future = executor.submit(func, **params)
+                                        # def safe_run_inline(func_name, args, kwargs, timeout=10):
+                                        #future = executor.submit(func, **params)
+                                        #newres = future.result(timeout)
+                                        allowed_methods = {
+                                            "set_key": textwrap.dedent(inspect.getsource(self.set_key)),
+                                        }
+
+                                        print(params)
+
+                                        future = executor.submit(
+                                            run_user_function_isolated,
+                                            func,
+                                            args=[params],
+                                            kwargs=params.get("kwargs", {}),
+                                            allowed_methods=allowed_methods,
+                                            timeout=timeout
+                                        )
+
                                         newres = future.result(timeout)
 
                                         if not future.done():
@@ -4080,7 +4183,7 @@ class AppBase:
                                             future.cancel()
                                             newres = json.dumps({
                                                 "success": False,
-                                                "exception": str(e),
+                                                "exception": "TimeoutError: Function execution exceeded time limit of %d seconds." % timeout,
                                                 "reason": "Timeout error within %d seconds (1). This happens if we can't reach or use the API you're trying to use within the time limit. Configure SHUFFLE_APP_SDK_TIMEOUT=100 in Orborus to increase it to 100 seconds. If you want to change this for cloud-hosted apps, contact support@shuffler.io." % timeout,
                                             })
 
