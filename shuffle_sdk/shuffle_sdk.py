@@ -322,6 +322,12 @@ def url_decode(base):
     return unquote_plus(base)
 
 
+@shuffle_filters.register
+def tojson(a):
+    """Convert to JSON string"""
+    return json.dumps(a)
+
+
 ###
 ###
 ###
@@ -2968,9 +2974,13 @@ class AppBase:
 
         # Sending self as it's not a normal function
         def parse_liquid(template, self):
-            
+
+            # Save the original template to return on errors
+            original_template = template
             errors = False
             error_msg = ""
+            error_type = None
+            print(f"[PARSE_LIQUID] Input template length: {len(template)}", file=sys.stderr, flush=True)
             try:
                 if len(template) > 10000000:
                     self.logger.info("[DEBUG] Skipping liquid - size too big (%d)" % len(template))
@@ -2983,14 +2993,14 @@ class AppBase:
 
                 # New pattern fixer to help with bad liquid formats
                 try:
-                    newoutput = self.patternfix_string(template, 
+                    newoutput = self.patternfix_string(template,
                         {
                             "{{|": '{{ "" |',
                         },
                         {
                             r'\{\{\s*\$[^|}]+\s*\|': '{{ "" |',
                         }
-                        , 
+                        ,
                         inputtype="liquid"
                     )
 
@@ -2998,67 +3008,44 @@ class AppBase:
                 except Exception as e:
                     print("[ERROR] Failed liquid parsing fix: %s" % e)
 
-                all_globals = globals()
-                all_globals["self"] = self
+                # Sandboxed rendering: runs in isolated subprocess with
+                # wild mode, shuffle_filters, and self/singul/shuffle globals
+                result = self.run_liquid_sandboxed(template)
 
-                try:
-                    all_globals["singul"] = self.singul
-                    all_globals["shuffle"] = self.singul
-                except Exception as e:
-                    self.logger.info("[ERROR][%s] Failed to set singul in liquid: %s" % (self.current_execution_id, e))
-
-                run = Liquid(template, mode="wild", from_file=False, filters=shuffle_filters.filters, globals=all_globals)
-
-                # Add locals that are missing to globals
-                ret = run.render()
-                return ret
+                if result.get("success"):
+                    # Success - return the rendered template
+                    return result.get("result", template)
+                else:
+                    # Error from worker - set error and return original
+                    error = True
+                    error_msg = result.get("error", "Liquid rendering failed")
+                    error_type = result.get("error_type", "")
             except jinja2.exceptions.TemplateNotFound as e:
-                self.logger.info(f"[ERROR] Liquid Template error: {e}")
+                print(f"[ERROR] Liquid Template error: {e}", file=sys.stderr, flush=True)
                 error = True
+                error_type = "TemplateNotFound"
                 error_msg = e
-
-                self.action["parameters"].append({
-                    "name": "liquid_template_error",
-                    "value": f"There was a Liquid input error (1). Details: {e}",
-                })
-
-                self.action_result["action"] = self.action
             except SyntaxError as e:
                 self.logger.info(f"[ERROR] Liquid Syntax error: {e}")
                 error = True
+                error_type = "SyntaxError"
                 error_msg = e
 
-                self.action["parameters"].append({
-                    "name": "liquid_python_syntax_error",
-                    "value": f"There was a syntax error in your Liquid input (2). Details: {e}",
-                })
-
-                self.action_result["action"] = self.action
             except IndentationError as e:
                 self.logger.info(f"[ERROR] Liquid IndentationError: {e}")
                 error = True
+                error_type = "IndentationError"
                 error_msg = e
 
-                self.action["parameters"].append({
-                    "name": "liquid_indentiation_error",
-                    "value": f"There was an indentation error in your Liquid input (2). Details: {e}",
-                })
-
-                self.action_result["action"] = self.action
             except jinja2.exceptions.TemplateSyntaxError as e:
                 self.logger.info(f"[ERROR] Liquid Syntax error: {e}")
                 error = True
+                error_type = "TemplateSyntaxError"
                 error_msg = e
 
-                self.action["parameters"].append({
-                    "name": "liquid_syntax_error",
-                    "value": f"There was a syntax error in your Liquid input (2). Details: {e}",
-                })
-
-                self.action_result["action"] = self.action
             except json.decoder.JSONDecodeError as e:
                 self.logger.info(f"[ERROR] Liquid JSON Syntax error: {e}")
-                
+
                 replace = False
                 skip_next = False
                 newlines = []
@@ -3068,7 +3055,7 @@ class AppBase:
                         if replace:
                             skip_next = True
                         else:
-                            replace = not replace 
+                            replace = not replace
 
                     if replace == True:
                         thisline.append(line)
@@ -3087,14 +3074,9 @@ class AppBase:
                     return parse_liquid(new_template, self)
                 else:
                     error = True
+                    error_type = "JSONDecodeError"
                     error_msg = e
 
-                    self.action["parameters"].append({
-                        "name": "liquid_json_error",
-                        "value": f"There was a syntax error in your input JSON(2). This is typically an issue with escaping newlines. Details: {e}",
-                    })
-
-                    self.action_result["action"] = self.action
             except TypeError as e:
                 try:
                     if "string as left operand" in f"{e}":
@@ -3113,61 +3095,72 @@ class AppBase:
 
                         splititem = "%s \"%s\"" % (additem, splititem.strip())
                         parsed_template = template.replace(split_left[0], splititem)
-                        run = Liquid(parsed_template, mode="wild", from_file=False)
-                        return run.render(**globals())
+                        retry_result = self.run_liquid_sandboxed(parsed_template)
+                        if retry_result.get("success"):
+                            return retry_result.get("result", template)
+                        else:
+                            raise Exception(retry_result.get("error", "Liquid retry failed"))
 
                 except Exception as e:
-                    self.action["parameters"].append({
-                        "name": "liquid_general_error",
-                        "value": f"There was general error Liquid input (2). Details: {e}",
-                    })
+                    self.logger.info(f"[ERROR] Liquid TypeError error: {e}")
+                    error = True
+                    error_type = "TypeError"
+                    error_msg = e
 
-                    self.action_result["action"] = self.action
-                    #return template
-
-                self.logger.info(f"[ERROR] Liquid TypeError error: {e}")
-                error = True
-                error_msg = e
 
             except Exception as e:
+                print(f"[PARSE_LIQUID] CAUGHT EXCEPTION: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
                 self.logger.info(f"[ERROR] General exception for liquid: {e}")
                 error = True
+                error_type = type(e).__name__
                 error_msg = e
+                print(f"[PARSE_LIQUID] Set error=True, error_msg={error_msg}", file=sys.stderr, flush=True)
 
-                self.action["parameters"].append({
-                    "name": "liquid_general_exception",
-                    "value": f"There was general exception Liquid input (2). Details: {e}",
-                })
 
-                self.action_result["action"] = self.action
-
-            if "fmt" in error_msg and "liquid_date" in error_msg:
-                return template
+            if "fmt" in str(error_msg) and "liquid_date" in str(error_msg):
+                return original_template
 
             self.logger.info("Done in liquid")
+            print(f"[PARSE_LIQUID] Before error check: error={error}, error_msg={error_msg}", file=sys.stderr, flush=True)
             if error == True:
-                self.action_result["status"] = "FAILURE" 
-                data = {
-                    "success": False,
-                    "reason": f"Failed to parse LiquidPy: {error_msg}",
-                    "input": template,
-                }
+                # Restore backwards compatibility: add specific error parameter names
+                # based on error type for workflows that depend on these
+                error_type_name = None
 
-                try:
-                    self.action_result["result"] = json.dumps(data)
-                except Exception as e:
-                    self.action_result["result"] = f"Failed to parse LiquidPy: {error_msg}"
-
-                self.action_result["completed_at"] = int(time.time_ns())
-                self.send_result(self.action_result, headers, stream_path)
-
-                self.logger.info(f"[ERROR] Sent FAILURE response to backend due to : {e}")
-        
-                if runtime == "run":
-                    return template
+                if error_type == "TemplateNotFound":
+                    error_type_name = "liquid_template_error"
+                elif error_type == "SyntaxError":
+                    error_type_name = "liquid_python_syntax_error"
+                elif error_type == "IndentationError":
+                    error_type_name = "liquid_indentiation_error"  # Keep the typo for compatibility
+                elif error_type == "TemplateSyntaxError":
+                    error_type_name = "liquid_syntax_error"
+                elif error_type == "JSONDecodeError":
+                    error_type_name = "liquid_json_error"
+                elif error_type == "TypeError":
+                    error_type_name = "liquid_general_error"
                 else:
-                    os.exit()
+                    error_type_name = "liquid_general_exception"
 
+                # Add the error parameter with specific name
+                if error_msg:
+                    print(f"[PARSE_LIQUID] ERROR: {error_msg}", file=sys.stderr, flush=True)
+                    self.action["parameters"].append({
+                        "name": error_type_name,
+                        "value": f"{error_msg}",
+                    })
+
+                # Also add generic error for workflows that expect it
+                self.action["parameters"].append({
+                    "name": "error",
+                    "value": f"{error_msg}",
+                })
+
+                # Return the original template on error so user can see what they tried
+                print(f"[PARSE_LIQUID] Returning original template (length: {len(original_template)})", file=sys.stderr, flush=True)
+                return original_template
+
+            print(f"[PARSE_LIQUID] Returning rendered template (length: {len(template)})", file=sys.stderr, flush=True)
             return template
 
         def recurse_cleanup_script(data):
@@ -4377,6 +4370,42 @@ class AppBase:
         #    print(f"[WARNING] Failed to close logs (2): {e}") 
 
         return
+
+    # =========================================================================
+    # SANDBOXED EXECUTION
+    # =========================================================================
+
+    def run_python_sandboxed(self, code):
+        """
+        Execute Python code in isolated subprocess.
+
+        The sandboxed code has access to 'self' (this SDK instance).
+
+        Returns:
+            {"success": True, "result": ...} or {"success": False, "error": ...}
+        """
+        from . import sandbox
+        return sandbox.run_python(code, self)
+
+    def run_bash_sandboxed(self, code, shuffle_input=None):
+        """
+        Execute bash command in isolated subprocess.
+
+        Returns:
+            {"success": True, "result": ...} or {"success": False, "error": ...}
+        """
+        from . import sandbox
+        return sandbox.run_bash(code, self, shuffle_input)
+
+    def run_liquid_sandboxed(self, template):
+        """
+        Render Liquid template in isolated subprocess.
+
+        Returns:
+            {"success": True, "result": ...} or {"success": False, "error": ...}
+        """
+        from . import sandbox
+        return sandbox.run_liquid(template, self)
 
     @classmethod
     def run(cls, action=""):
