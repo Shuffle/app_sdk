@@ -48,7 +48,7 @@ SANDBOX_ENABLED = True
 # But set to 55 seconds (5 less) to give worker time before parent timeout
 _env_timeout = os.getenv("SHUFFLE_APP_SDK_TIMEOUT")
 TIMEOUT_SECONDS = int(_env_timeout) - 5 if _env_timeout else 55
-MAX_OUTPUT_BYTES = 10 * 1024 * 1024  # 10MB
+MAX_OUTPUT_BYTES = 250 * 1024 * 1024  # 250MB
 
 # Print to stderr at module load time to ensure visibility
 _msg = "=" * 80
