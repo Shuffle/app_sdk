@@ -1515,10 +1515,10 @@ class AppBase:
         return myzipfile
 
     def get_file_namespace_ids(self, namespace):
-        return self.get_file_category_ids(self, namespace)
+        return self.get_file_category_ids(namespace)
 
     def get_file_category(self, category):
-        return self.get_file_namespace(self, category)
+        return self.get_file_namespace(category)
 
     # Things to consider for files:
     # - How can you download / stream a file? 
