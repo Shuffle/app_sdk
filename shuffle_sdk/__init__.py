@@ -1,7 +1,25 @@
 # __init__.py
-from .shuffle_sdk import AppBase, csv_parse
+# In Docker image, shuffle_sdk.py is renamed to app_base.py
+try:
+    from .app_base import AppBase, csv_parse, shuffle_filters
+except (ImportError, ModuleNotFoundError):
+    from .shuffle_sdk import AppBase, csv_parse, shuffle_filters
 
-__all__ = ["AppBase", "csv_parse"]  # Define the public API of your package
+from .sandbox import run_python, run_bash, run_liquid, is_available, configure, SANDBOX_ENABLED
 
-#print("Initializing shuffle_sdk package...")
+__all__ = [
+    "AppBase",
+    "csv_parse",
+    "shuffle_filters",
+    "run_python",
+    "run_bash",
+    "run_liquid",
+    "is_available",
+    "configure",
+    "SANDBOX_ENABLED",
+]
+
 __version__ = '0.0.26'
+
+import sys
+print(f"[SHUFFLE_SDK] Initialized", file=sys.stderr, flush=True)
