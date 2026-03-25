@@ -4098,8 +4098,11 @@ class AppBase:
                                     break
                                 except TypeError as e:
                                     newres = ""
-                                    self.logger.info(f"[ERROR] Got function exec type error: {e}")
+
                                     try:
+                                        if not "got unexpected" in f"{e}":
+                                            self.logger.info(f"[ERROR] Got function exec type error: {e}")
+
                                         e = json.loads(f"{e}")
                                     except:
                                         e = f"{e}"
