@@ -2130,13 +2130,25 @@ class AppBase:
         # Forcing this to run due to potential self.full_execution loading issues in cloud run
         fullexecution = {}
         if self.standalone == True:
+            standalone_variables = []
+            try:
+                for param in self.action["parameters"]:
+                    standalone_variables.append({
+                        "name": param.get("name", ""),
+                        "value": param.get("value", ""),
+                    })
+            except Exception:
+                pass
+
             fullexecution = {
                 "workflow": {
                     "id": "STANDALONE",
                     "execution_org": {
                         "id": "STANDALONE"
                     }
-                }
+                },
+                "results": [],
+                "execution_variables": standalone_variables,
             }
 
         elif True or (isinstance(self.full_execution, str) and len(self.full_execution) == 0):
@@ -2937,16 +2949,16 @@ class AppBase:
 
             if isinstance(parseditem, dict) or isinstance(parseditem, list):
                 try:
-                    parseditem = json.dumps(parseditem)
+                    parseditem = json.dumps(parseditem, ensure_ascii=False)
                 except json.decoder.JSONDecodeError as e:
                     pass
 
             if is_loop:
                 if parsersplit[-1] == "#":
-                    parseditem = "${SHUFFLE_NO_SPLITTER%s}$" % json.dumps(data)
+                    parseditem = "${SHUFFLE_NO_SPLITTER%s}$" % json.dumps(data, ensure_ascii=False)
                 else:
                     # Return value: ${id[12345, 45678]}$
-                    parseditem = "${%s%s}$" % (parsersplit[-1], json.dumps(data))
+                    parseditem = "${%s%s}$" % (parsersplit[-1], json.dumps(data, ensure_ascii=False))
 
 
             returndata = str(parseditem)+str(appendresult)
@@ -2959,7 +2971,7 @@ class AppBase:
             # This breaks EVERYTHING
             try:
                 if (returndata.endswith("}") and returndata.endswith("}")) or (returndata.startswith("[") and returndata.endswith("]")):
-                    return json.dumps(json.loads(returndata)), is_loop
+                    return json.dumps(json.loads(returndata), ensure_ascii=False), is_loop
                 else:
                     return returndata, is_loop
             except json.decoder.JSONDecodeError as e:
@@ -3375,7 +3387,7 @@ class AppBase:
                         elif isinstance(value, dict) or isinstance(value, list):
                             # Changed from JSON dump to str() 28.05.2021
                             # This makes it so the parameters gets lists and dicts straight up
-                            parameter["value"] = parameter["value"].replace(to_be_replaced, json.dumps(value), 1)
+                            parameter["value"] = parameter["value"].replace(to_be_replaced, json.dumps(value, ensure_ascii=False), 1)
 
                             #try:
                             #    parameter["value"] = parameter["value"].replace(to_be_replaced, json.dumps(value))
@@ -3385,7 +3397,7 @@ class AppBase:
                         else:
                             self.logger.error("[ERROR] Unknown type %s" % type(value))
                             try:
-                                parameter["value"] = parameter["value"].replace(to_be_replaced, json.dumps(value), 1)
+                                parameter["value"] = parameter["value"].replace(to_be_replaced, json.dumps(value, ensure_ascii=False), 1)
                             except json.decoder.JSONDecodeError as e:
                                 parameter["value"] = parameter["value"].replace(to_be_replaced, value, 1)
 
@@ -3876,7 +3888,11 @@ class AppBase:
                                     for key, value in replacements.items():
                                         replacement = value
                                         try:
-                                            replacement = json.dumps(json.loads(value)[i])
+                                            replacement_item = json.loads(value)[i]
+                                            if isinstance(replacement_item, (dict, list)):
+                                                replacement = json.dumps(replacement_item, ensure_ascii=False)
+                                            else:
+                                                replacement = str(replacement_item)
                                         except IndexError as e:
                                             self.logger.info(f"[ERROR] Failed handling value parsing with index: {e}")
                                             pass
@@ -4218,13 +4234,13 @@ class AppBase:
                                     "file_ids": file_ids
                                 }
                                 
-                                result = json.dumps(tmp_result)
+                                result = json.dumps(tmp_result, ensure_ascii=False)
                             elif isinstance(newres, str):
                                 #self.logger.info("[INFO] Handling return as string of length %d" % len(newres))
                                 result += newres
                             elif isinstance(newres, dict) or isinstance(newres, list):
                                 try:
-                                    result += json.dumps(newres, indent=4)
+                                    result += json.dumps(newres, indent=4, ensure_ascii=False)
                                 except json.JSONDecodeError as e:
                                     self.logger.info("[WARNING] Failed decoding result: %s" % e)
                                     try:
@@ -4289,7 +4305,7 @@ class AppBase:
                                 # This part is weird lol
                                 if json_object:
                                     try:
-                                        result = json.dumps(results)
+                                        result = json.dumps(results, ensure_ascii=False)
                                     except json.JSONDecodeError as e:
                                         self.logger.info(f"Failed to decode: {e}")
                                         result = results
