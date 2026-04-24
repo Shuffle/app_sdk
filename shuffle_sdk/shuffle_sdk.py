@@ -1647,13 +1647,13 @@ class AppBase:
             "body": resp.text,
         }
 
-    def set_key(self, key, value, category=""):
-        return self.set_cache(key, value, category=category)
+    def set_key(self, key, value, category="", ignore_security_rules=False):
+        return self.set_cache(key, value, category=category, ignore_security_rules=ignore_security_rules)
 
-    def set_datastore_key(self, key, value, category=""):
-        return self.set_cache(key, value, category=category)
+    def set_datastore_key(self, key, value, category="", ignore_security_rules=False):
+        return self.set_cache(key, value, category=category, ignore_security_rules=ignore_security_rules)
 
-    def set_cache(self, key, value, category=""):
+    def set_cache(self, key, value, category="", ignore_security_rules=False):
         org_id = self.full_execution["workflow"]["execution_org"]["id"]
         url = "%s/api/v1/orgs/%s/set_cache" % (self.url, org_id)
         data = {
@@ -1664,6 +1664,9 @@ class AppBase:
             "key": str(key),
             "value": str(value),
         }
+
+        if ignore_security_rules == True:
+            data["ignore_security_rules"] = True
 
         if category:
             data["category"] = category
@@ -2860,7 +2863,7 @@ class AppBase:
                         appendresult += char
 
                 actionname_lower = "exec"
-            elif actionname_lower.startswith("shuffle_cache ") or actionname_lower.startswith("shuffle_db "): 
+            elif actionname_lower.startswith("shuffle_cache ") or actionname_lower.startswith("shuffle_db ") or actionname_lower.startswith("shuffle_datastore "): 
                 actionname_lower = "shuffle_cache"
 
             actionname_lower = actionname_lower.replace(" ", "_", -1)
