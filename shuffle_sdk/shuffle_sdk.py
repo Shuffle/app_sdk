@@ -2059,6 +2059,7 @@ class AppBase:
                 "name": args.action,
                 "parameters": [],
                 "standalone": True,
+                "id": "standalone",
 
                 "app_name": ""
             }
@@ -2084,8 +2085,6 @@ class AppBase:
                     # Remove quotes before/after
                     if newkey.startswith("'") and newkey.endswith("'"):
                         newkey = newkey[1:-1]
-
-                    print("KEY: %s" % newkey)
 
                     if newkey == "shuffle_authorization":
                         self.authorization = keysplit[1]
@@ -3509,21 +3508,31 @@ class AppBase:
             # relevantbranches = workflow.branches where destination = action
             try:
                 if fullexecution["workflow"]["branches"] == None or len(fullexecution["workflow"]["branches"]) == 0:
+                    if os.getenv("DEBUG", "").lower() == "true":
+                        self.logger.info("[DEBUG] No branches found in workflow, skipping branch condition checks.")
+
                     return True, ""
             except KeyError:
                 return True, ""
 
             # Startnode should always run - no need to check incoming
             # Removed November 2023 due to people wanting startnode to also check
-            # This is to make it possible ot 
-            try:
-                if action["id"] == fullexecution["start"]:
-                    return True, ""
+            # Re-Removed April 2026 to optimise e.g. for scheduler and single action sub-runs
+            #try:
+            #    pass
+            #    if action["id"] == fullexecution["start"]:
+            #        if os.getenv("DEBUG", "").lower() == "true":
+            #            self.logger.info("[DEBUG] Action is start node, skipping branch condition checks.")
 
-            except Exception as error:
-                self.logger.info(f"[WARNING] Failed checking startnode: {error}")
-                #return True, ""
-                #return True, ""
+            #        return True, ""
+
+            #except Exception as error:
+            #    self.logger.info(f"[WARNING] Failed checking startnode: {error}")
+            #    #return True, ""
+            #    #return True, ""
+
+            if os.getenv("DEBUG", "").lower() == "true":
+                self.logger.info("[DEBUG] Checking branch conditions for action %s" % action["id"])
 
             available_checks = [
                 "=",
@@ -3649,9 +3658,43 @@ class AppBase:
         #
         #
         if self.standalone:
+            fullexecution["start"] = "standalone"
+            fullexecution["workflow"]["branches"] = [{
+                "source_id": "huh",
+                "destination_id": "standalone",
+                "_id": "b0170bd1-11bc-4bc0-ab2f-c09b2d55f47f",
+                "id": "b0170bd1-11bc-4bc0-ab2f-c09b2d55f47f",
+                "conditions": [
+                    {
+                        "source": {
+                            "name": "source",
+                            "value": "true",
+                            "variant": "STATIC_VALUE",
+                            "action_field": "",
+                            "id": "458ff31c-4c27-4309-8891-b8b9e7bb624c"
+                        },
+                        "condition": {
+                            "name": "condition",
+                            "value": "equals",
+                            "id": "458ff31c-4c27-4309-8891-b8b9e7bb624c"
+                        },
+                        "destination": {
+                            "name": "destination",
+                            "value": "true",
+                            "variant": "STATIC_VALUE",
+                            "action_field": "",
+                            "id": "458ff31c-4c27-4309-8891-b8b9e7bb624c"
+                        }
+                    }
+                ],
+                "label": "",
+                "is_valid": True,
+            }]
+
+            # Just a test even we've been using to have $exec ref
             fullexecution["execution_argument"] = '{"activity":[{"attachments":[],"content":"@AIAgent what about 1.2.3.4?","details":"From: Diego Ruiz\nTo: phishing@example.com\nSubject: FW: [SUSPICIOUS] IT Support — Action required: reset your MFA\nDate: Thu, 23 Apr 2026 12:49:48 GMT\n\nHi security team,\n\nForwarding the email below — it looks like a phishing attempt impersonating IT support. I did not click the link.\n\nI also noticed my colleague Sarah Chen (Finance Analyst) received the exact same message. I have not been able to confirm yet whether she clicked it. Could you take a look?\n\nThanks,\nDiego Ruiz\nSenior Accountant, Finance\n\n---------- Forwarded message ----------\nFrom: IT Support\nTo: diego.ruiz@example.com\nSubject: [Action required] Reset your MFA within 24 hours\nDate: Thu, 23 Apr 2026 12:35:48 GMT\n\nDear user,\n\nOur records indicate that your multi-factor authentication enrollment is out of date. To avoid losing access to your account, please reset your MFA within the next 24 hours by visiting the secure portal below:\n\nhttps://112.94.99.84/mfa-reset?u=schen\n\nIf you do not complete this step, your account will be temporarily suspended.\n\nThank you,\nIT Support Team"}'
 
-        # THE START IS ACTUALLY RIGHT HERE :O
+        # THE START IS ACTUALLY RIGHT HERE 
         # Checks whether conditions are met, otherwise set 
         branchcheck, tmpresult = check_branch_conditions(action, fullexecution, self)
         if isinstance(tmpresult, object) or isinstance(tmpresult, list) or isinstance(tmpresult, dict):
@@ -3665,6 +3708,17 @@ class AppBase:
 
         # IF branches fail: Exit!
         if not branchcheck:
+            if self.standalone or self.authorization == "standalone": 
+                valid_json = False
+                try:
+                    json_object = json.loads(tmpresult)
+                    valid_json = True
+                except Exception as e:
+                    pass
+
+                print("\n\n===== Successful result From the Function (JSON: %s) =====\n\n%s" % (valid_json, tmpresult))
+                exit()
+
             self.action_result["result"] = tmpresult
             self.action_result["status"] = "SKIPPED"
             self.action_result["completed_at"] = int(time.time_ns())
