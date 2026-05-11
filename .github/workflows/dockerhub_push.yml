@@ -46,7 +46,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Ghcr Build and push
+      - name: Build and push to DockerHub
         id: docker_build
         uses: docker/build-push-action@v4
         env:
@@ -60,8 +60,6 @@ jobs:
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
           tags: |
-            ghcr.io/shuffle/shuffle-${{ matrix.app }}:${{ matrix.version }}
-            ghcr.io/shuffle/shuffle-${{ matrix.app }}:nightly
             ${{ secrets.DOCKERHUB_USERNAME }}/shuffle-${{ matrix.app }}:${{ matrix.version }}
             ${{ secrets.DOCKERHUB_USERNAME }}/shuffle-${{ matrix.app }}:nightly
             frikky/shuffle-${{ matrix.app }}:${{ matrix.version }}
@@ -70,3 +68,23 @@ jobs:
 
       - name: Image digest
         run: echo ${{ steps.docker_build.outputs.digest }}
+
+      - name: Push to Ghcr (optional)
+        continue-on-error: true
+        uses: docker/build-push-action@v4
+        env:
+          BUILDX_NO_DEFAULT_LOAD: true
+        with:
+          logout: false
+          context: ${{ matrix.path }}/
+          file: ${{ matrix.path }}/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          cache-from: type=local,src=/tmp/.buildx-cache
+          tags: |
+            ghcr.io/shuffle/shuffle-${{ matrix.app }}:${{ matrix.version }}
+            ghcr.io/shuffle/shuffle-${{ matrix.app }}:nightly
+
+      - name: Ghcr push status
+        if: steps.docker_build.outcome == 'success'
+        run: echo "::warning::Ghcr push may have failed — check logs. DockerHub push succeeded."
