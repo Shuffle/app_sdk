@@ -380,25 +380,35 @@ class AppBase:
         self.proxy_config = {
             "http": os.getenv("HTTP_PROXY", ""),
             "https": os.getenv("HTTPS_PROXY", ""),
-            "no_proxy": os.getenv("NO_PROXY", ""),
         }
 
         if len(os.getenv("SHUFFLE_INTERNAL_HTTP_PROXY", "")) > 0:
             self.proxy_config["http"] = os.getenv("SHUFFLE_INTERNAL_HTTP_PROXY", "")
 
         if len(os.getenv("SHUFFLE_INTERNAL_HTTPS_PROXY", "")) > 0:
-            self.proxy_config["https"] = os.getenv("SHUFFLE_INTERNAL_HTTP_PROXY", "")
-
-        if len(os.getenv("SHUFFLE_INTERNAL_NO_PROXY", "")) > 0:
-            self.proxy_config["no_proxy"] = os.getenv("SHUFFLE_INTERNAL_NO_PROXY", "")
+            self.proxy_config["https"] = os.getenv("SHUFFLE_INTERNAL_HTTPS_PROXY", "")
 
         try:
-            if self.proxy_config["http"].lower() == "noproxy":
+            if self.proxy_config.get("http", "").lower() == "noproxy":
                 self.proxy_config["http"] = ""
-            if self.proxy_config["https"].lower() == "noproxy":
+            if self.proxy_config.get("https", "").lower() == "noproxy":
                 self.proxy_config["https"] = ""
         except Exception as e:
             self.logger.info(f"[WARNING] Failed setting proxy config: {e}. NOT important if running apps with webserver. This is NOT critical.")
+
+        no_proxy_raw = os.getenv("SHUFFLE_INTERNAL_NO_PROXY", "") or os.getenv("NO_PROXY", "") or os.getenv("no_proxy", "")
+        for host in no_proxy_raw.split(","):
+            host = host.strip()
+            if host:
+                self.proxy_config.setdefault("http://%s" % host, "")
+                self.proxy_config.setdefault("https://%s" % host, "")
+
+        proxy_override = os.getenv("SHUFFLE_APP_PROXY_CONFIG_OVERRIDE", "")
+        if proxy_override:
+            try:
+                self.proxy_config.update(json.loads(proxy_override))
+            except Exception as e:
+                self.logger.info(f"[WARNING] Failed parsing SHUFFLE_APP_PROXY_CONFIG_OVERRIDE: {e}")
 
 
         if isinstance(self.action, str):
