@@ -1,4 +1,4 @@
-FROM python:3.10.18-alpine as base
+FROM python:3.14.3-alpine as base
 
 # >3.10 has optimizations that break shared memory of variables
 # IF you are updating the version of Python, it will need EXTENSIVE testing
