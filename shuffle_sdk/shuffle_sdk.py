@@ -4012,6 +4012,11 @@ class AppBase:
                                     multi_execution_lists.append(resultarray)
 
                                 multi_parameters[parameter["name"]] = resultarray
+
+                                for stored_param in action["parameters"]:
+                                    if stored_param["name"] == parameter["name"]:
+                                        stored_param["value"] = json.dumps(resultarray)
+                                        break
                             else:
                                 # Parses things like int(value)
                                 #self.logger.info("[DEBUG] Normal parsing (not looping)")#with data %s" % value)
