@@ -3932,13 +3932,17 @@ class AppBase:
                                         continue
 
                                     try:
-                                        itemlist = json.loads(actualitem)
+                                        try:
+                                            itemlist = json.loads(actualitem)
+                                        except json.decoder.JSONDecodeError:
+                                            itemlist = json.loads(actualitem.replace('\\"', '"'))
+
                                         if len(itemlist) > minlength:
                                             minlength = len(itemlist)
 
                                         if len(itemlist) > curminlength:
                                             curminlength = len(itemlist)
-                                        
+
                                     except json.decoder.JSONDecodeError as e:
                                         self.logger.info("JSON Error (replace): %s in %s" % (e, actualitem))
 
