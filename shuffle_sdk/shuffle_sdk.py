@@ -3935,7 +3935,8 @@ class AppBase:
                                         try:
                                             itemlist = json.loads(actualitem)
                                         except json.decoder.JSONDecodeError:
-                                            itemlist = json.loads(actualitem.replace('\\"', '"'))
+                                            actualitem = actualitem.replace('\\"', '"')
+                                            itemlist = json.loads(actualitem)
 
                                         if len(itemlist) > minlength:
                                             minlength = len(itemlist)
