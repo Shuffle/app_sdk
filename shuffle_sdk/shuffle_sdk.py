@@ -4177,7 +4177,7 @@ class AppBase:
                             found_error = ""
                             while True:
                                 iteration_count += 1
-                                if iteration_count >= 10:
+                                if iteration_count >= 60:
                                     newres = {
                                         "success": False,
                                         "reason": "Iteration count more than 10. This happens if the input to the action is wrong. Try remaking the action, and contact support@shuffler.io if this persists.", 
