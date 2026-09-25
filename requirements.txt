@@ -6,3 +6,4 @@ flask[async]==3.1.0
 waitress==3.0.2
 python-dateutil==2.9.0.post0
 shufflepy==0.2.2
+idna>=3.15 # not directly required, pinned by Snyk to avoid a vulnerability
