@@ -26,10 +26,10 @@ from shufflepy import Singul
 
 from io import StringIO as StringBuffer, BytesIO 
 from liquid import Liquid, defaults
-from requests.packages.urllib3.exceptions import InsecureRequestWarning
+from urllib3.exceptions import InsecureRequestWarning
 
 # Suppress the warning
-requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+urllib3.disable_warnings(InsecureRequestWarning)
 
 
 runtime = os.getenv("SHUFFLE_SWARM_CONFIG", "")
@@ -1601,11 +1601,15 @@ class AppBase:
         else:
             return returns
 
-    def delete_key(self, key, category=""):
-        return self.delete_cache(key, category=category)
+    def delete_key(self, key, category="", org_id=""):
+        return self.delete_cache(key, category=category, org_id=org_id)
 
-    def delete_cache(self, key, category=""):
-        org_id = self.full_execution["workflow"]["execution_org"]["id"]
+    def delete_cache(self, key, category="", org_id=""):
+        headers = {}
+        if org_id:
+            headers["Org-Id"] = str(org_id)
+        else:
+            org_id = self.full_execution["workflow"]["execution_org"]["id"]
         url = "%s/api/v1/orgs/%s/delete_cache" % (self.url, org_id)
 
         data = {
@@ -1632,7 +1636,7 @@ class AppBase:
         except Exception as e:
             print("[ERROR] Failed DELETING current execution id local storage: %s" % e)
 
-        response = requests.post(url, json=data, verify=False, proxies=self.proxy_config)
+        response = requests.post(url, headers=headers, json=data, verify=False, proxies=self.proxy_config)
         try:
             allvalues = response.json()
             return json.dumps(allvalues)
@@ -1641,14 +1645,18 @@ class AppBase:
             #return response.json()
             return json.dumps({"success": False, "reason": f"Failed to delete cache for key '{key}'"})
 
-    def list_category(self, category, items=50):
+    def list_category(self, category, items=50, org_id=""):
 
         if len(category) == 0:
             return {"success": False, "reason": "Category can't be empty"}
 
-        org_id = self.full_execution["workflow"]["execution_org"]["id"]
+        headers = {}
+        if org_id:
+            headers["Org-Id"] = str(org_id)
+        else:
+            org_id = self.full_execution["workflow"]["execution_org"]["id"]
         url = "%s/api/v2/datastore?category=%s&top=%d" % (self.url, category, items)
-        resp = requests.get(url, verify=False, proxies=self.proxy_config)
+        resp = requests.get(url, headers=headers, verify=False, proxies=self.proxy_config)
         return {
             "success": resp.status_code == 200,
             "status": resp.status_code,
@@ -1657,14 +1665,18 @@ class AppBase:
             "body": resp.text,
         }
 
-    def set_key(self, key, value, category="", ignore_security_rules=False):
-        return self.set_cache(key, value, category=category, ignore_security_rules=ignore_security_rules)
+    def set_key(self, key, value, category="", ignore_security_rules=False, org_id=""):
+        return self.set_cache(key, value, category=category, ignore_security_rules=ignore_security_rules, org_id=org_id)
 
-    def set_datastore_key(self, key, value, category="", ignore_security_rules=False):
-        return self.set_cache(key, value, category=category, ignore_security_rules=ignore_security_rules)
+    def set_datastore_key(self, key, value, category="", ignore_security_rules=False, org_id=""):
+        return self.set_cache(key, value, category=category, ignore_security_rules=ignore_security_rules, org_id=org_id)
 
-    def set_cache(self, key, value, category="", ignore_security_rules=False):
-        org_id = self.full_execution["workflow"]["execution_org"]["id"]
+    def set_cache(self, key, value, category="", ignore_security_rules=False, org_id=""):
+        headers = {}
+        if org_id:
+            headers["Org-Id"] = str(org_id)
+        else:
+            org_id = self.full_execution["workflow"]["execution_org"]["id"]
         url = "%s/api/v1/orgs/%s/set_cache" % (self.url, org_id)
         data = {
             "workflow_id": self.full_execution["workflow"]["id"],
@@ -1694,7 +1706,7 @@ class AppBase:
         except Exception as e:
             print("[ERROR] Failed SETTING current execution id local storage: %s" % e)
 
-        response = requests.post(url, json=data, verify=False, proxies=self.proxy_config)
+        response = requests.post(url, headers=headers, json=data, verify=False, proxies=self.proxy_config)
         try:
             allvalues = response.json()
             allvalues["key"] = key
@@ -1705,14 +1717,18 @@ class AppBase:
             #return response.json()
             return {"success": False}
 
-    def get_key(self, key, category=""):
-        return self.get_cache(key, category=category)
+    def get_key(self, key, category="", org_id=""):
+        return self.get_cache(key, category=category, org_id=org_id)
 
-    def get_datastore_key(self, key, category=""):
-        return self.get_cache(key, category=category)
+    def get_datastore_key(self, key, category="", org_id=""):
+        return self.get_cache(key, category=category, org_id=org_id)
 
-    def get_cache(self, key, category=""):
-        org_id = self.full_execution["workflow"]["execution_org"]["id"]
+    def get_cache(self, key, category="", org_id=""):
+        headers = {}
+        if org_id:
+            headers["Org-Id"] = str(org_id)
+        else:
+            org_id = self.full_execution["workflow"]["execution_org"]["id"]
         url = "%s/api/v1/orgs/%s/get_cache" % (self.url, org_id)
         data = {
             "workflow_id": self.full_execution["workflow"]["id"],
@@ -1738,7 +1754,7 @@ class AppBase:
         except Exception as e:
             print("[ERROR] Failed getting current execution id local storage: %s" % e)
 
-        value = requests.post(url, json=data, verify=False, proxies=self.proxy_config)
+        value = requests.post(url, headers=headers, json=data, verify=False, proxies=self.proxy_config)
         try:
             allvalues = value.json()
             allvalues["key"] = key 
@@ -1761,6 +1777,41 @@ class AppBase:
         except:
             self.logger.info("Value couldn't be parsed, or json dump of value failed")
             #return value.json()
+            return {"success": False}
+
+    def increment_stat(self, key, value=1, org_id=""):
+        return self.increment_stats(key, value=value, org_id=org_id)
+
+    def increment_stats(self, key, value=1, org_id=""):
+        headers = {}
+        if org_id:
+            headers["Org-Id"] = str(org_id)
+        else:
+            org_id = self.full_execution["workflow"]["execution_org"]["id"]
+        url = "%s/api/v1/orgs/%s/stats" % (self.url, org_id)
+
+        try:
+            value = int(value)
+        except (ValueError, TypeError):
+            try:
+                value = float(value)
+            except (ValueError, TypeError):
+                pass
+
+        data = {
+            "workflow_id": self.full_execution["workflow"]["id"],
+            "execution_id": self.current_execution_id,
+            "authorization": self.authorization,
+            "org_id": org_id,
+            "key": str(key),
+            "value": value,
+        }
+
+        response = requests.post(url, headers=headers, json=data, verify=False, proxies=self.proxy_config)
+        try:
+            return response.json()
+        except Exception as e:
+            self.logger.info("[ERROR] Failed to parse response from increment_stats: %s" % e)
             return {"success": False}
 
     def update_file(self, file_id, content):
