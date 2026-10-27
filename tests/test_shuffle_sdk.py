@@ -2039,5 +2039,272 @@ class TestComplexParsingTypesAndConditionals(unittest.TestCase):
         self.assertFalse(json.loads(self.app.action_result["result"])["success"])
 
 
+class TestMemoryAndPythonVersionCompatibility(unittest.TestCase):
+    """
+    Tests for Python 3.8 -> 3.11/3.12/3.15 loop efficiency, C-level iteration
+    changes, dictionary mutation during for-loops, memory scaling, and leak prevention.
+    """
+
+    def setUp(self):
+        self.app = create_test_app(SampleIntegrationApp)
+
+    @patch("shuffle_sdk.shuffle_sdk.requests.post")
+    def test_large_for_loop_efficiency_and_memory_scaling(self, mock_post):
+        """
+        Verify that large multi-parameter `#` loops scale linearly O(N) in both
+        execution time and memory (rather than O(N^2) from repeated json.loads(value)[i]
+        and deep-copying full parameter lists inside nested C-level range loops),
+        and that per-iteration parameter references do not bleed across iterations.
+        """
+        import copy
+        import gc
+        import tracemalloc
+
+        num_items = 500
+        items = [
+            {"id": i, "meta": {"tag": f"item_{i}", "score": i * 2}}
+            for i in range(num_items)
+        ]
+        full_exec = {
+            "execution_id": "exec-loop-perf",
+            "authorization": "auth-perf",
+            "workflow": {"id": "wf-perf", "actions": [], "branches": []},
+            "results": [
+                {
+                    "action": {"id": "batch_node", "name": "batch", "label": "batch_node"},
+                    "result": json.dumps(items),
+                    "status": "SUCCESS",
+                }
+            ],
+        }
+        mock_post.side_effect = make_mock_post_for_execution(full_exec)
+
+        # Track every call to ensure each iteration gets an isolated dict copy
+        seen_payloads = []
+
+        def inspect_and_mutate(first_val, second_val):
+            # Mutate the passed dict in-place during iteration to verify it doesn't corrupt
+            # subsequent iterations or shared references in newer Python loop frames.
+            if isinstance(second_val, dict):
+                seen_payloads.append(copy.deepcopy(second_val))
+                second_val["mutated_in_loop"] = True
+            return {"id": first_val, "tag": second_val.get("tag") if isinstance(second_val, dict) else second_val}
+
+        self.app.inspect_and_mutate = inspect_and_mutate
+
+        action = {
+            "id": "act-loop-perf",
+            "name": "inspect_and_mutate",
+            "parameters": [
+                {"name": "first_val", "value": "$batch_node.#.id", "variant": "STATIC_VALUE"},
+                {"name": "second_val", "value": "$batch_node.#.meta", "variant": "STATIC_VALUE"},
+            ],
+        }
+
+        gc.collect()
+        tracemalloc.start()
+        start_time = time.perf_counter()
+
+        self.app.execute_action(action)
+
+        elapsed = time.perf_counter() - start_time
+        _, peak_bytes = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
+
+        self.assertEqual(self.app.action_result["status"], "SUCCESS")
+        parsed = json.loads(self.app.action_result["result"])
+        self.assertEqual(len(parsed), num_items)
+        self.assertEqual(parsed[0]["id"], 0)
+        self.assertEqual(parsed[0]["tag"], "item_0")
+        self.assertEqual(parsed[-1]["id"], num_items - 1)
+        self.assertEqual(parsed[-1]["tag"], f"item_{num_items - 1}")
+
+        # Verify no mutation bled across loop iterations
+        self.assertEqual(len(seen_payloads), num_items)
+        for p in seen_payloads:
+            self.assertNotIn("mutated_in_loop", p)
+
+        # 500 iterations should complete quickly (< 2.5s) and under 35MB peak memory
+        self.assertLess(elapsed, 2.5, f"500-item loop took too long ({elapsed:.2f}s) - possible O(N^2) regression")
+        self.assertLess(peak_bytes, 35 * 1024 * 1024, f"Peak memory too high ({peak_bytes} bytes)")
+
+    @patch("shuffle_sdk.shuffle_sdk.requests.post")
+    def test_dict_mutation_during_for_loop_iteration_with_hyphenated_params(self, mock_post):
+        """
+        Verify that hyphenated parameter names (e.g. 'first-param') combined with
+        subsequent JSON parameters do not trigger `RuntimeError: dictionary changed size during iteration`
+        inside `execute_action` when iterating over `params.items()`.
+        """
+        full_exec = {
+            "execution_id": "exec-hyphen",
+            "authorization": "auth-hyphen",
+            "workflow": {"id": "wf-hyphen", "actions": [], "branches": []},
+            "results": [],
+        }
+        mock_post.side_effect = make_mock_post_for_execution(full_exec)
+
+        received_kwargs = {}
+
+        def hyphen_target(**kwargs):
+            received_kwargs.update(kwargs)
+            return kwargs
+
+        self.app.hyphen_target = hyphen_target
+
+        action = {
+            "id": "act-hyphen",
+            "name": "hyphen_target",
+            "parameters": [
+                {"name": "first-param", "value": "alpha", "variant": "STATIC_VALUE"},
+                {"name": "second-param", "value": '{"nested": [1, 2, 3]}', "variant": "STATIC_VALUE"},
+                {"name": "third_json_list", "value": '["x", "y"]', "variant": "STATIC_VALUE"},
+            ],
+        }
+
+        self.app.execute_action(action)
+        self.assertEqual(self.app.action_result["status"], "SUCCESS")
+        # Both hyphen_replaced and JSON-parsed parameters must be present and properly cast
+        self.assertEqual(received_kwargs.get("first_param"), "alpha")
+        self.assertIsInstance(received_kwargs.get("second_param"), dict)
+        self.assertEqual(received_kwargs["second_param"]["nested"], [1, 2, 3])
+        self.assertEqual(received_kwargs.get("third_json_list"), ["x", "y"])
+
+    @patch("shuffle_sdk.shuffle_sdk.requests.post")
+    def test_repeated_microservice_executions_no_logger_handler_or_memory_leak(self, mock_post):
+        """
+        In HTTP/container mode (`run_Service`), a new App instance is created on every request
+        sharing the same module logger. Verify that repeated instantiations + executions
+        do not accumulate StreamHandlers, grow StringIO buffers unboundedly, or leak threads.
+        """
+        import copy
+        import gc
+        import tracemalloc
+
+        full_exec = {
+            "execution_id": "exec-leak-check",
+            "authorization": "auth-leak",
+            "workflow": {"id": "wf-leak", "actions": [], "branches": []},
+            "results": [],
+        }
+        mock_post.side_effect = lambda *args, **kwargs: MagicMock(
+            status_code=200,
+            text="OK",
+            json=MagicMock(return_value=full_exec),
+        )
+
+        shared_logger = logging.getLogger("shuffle_leak_test_logger")
+        shared_logger.handlers.clear()
+
+        action = {
+            "id": "act-leak-1",
+            "name": "greet",
+            "parameters": [{"name": "name", "value": "MemoryCheck", "variant": "STATIC_VALUE"}],
+        }
+
+        # Warmup
+        for _ in range(5):
+            app = SampleIntegrationApp(redis=None, logger=shared_logger, console_logger=shared_logger)
+            app.execute_action(copy.deepcopy(action))
+
+        gc.collect()
+        tracemalloc.start()
+
+        for i in range(50):
+            app = SampleIntegrationApp(redis=None, logger=shared_logger, console_logger=shared_logger)
+            app.logger.info("Iteration log line %d", i)
+            app.execute_action(copy.deepcopy(action))
+            # After send_result, the StringIO buffer should be truncated to free memory
+            self.assertEqual(app.log_capture_string.getvalue(), "")
+
+        gc.collect()
+        current_bytes, _ = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
+
+        # Verify shared_logger didn't accumulate 55 duplicate StreamHandlers
+        shuffle_handlers = [
+            h for h in shared_logger.handlers if getattr(h, "_shuffle_log_capture", False)
+        ]
+        self.assertEqual(len(shuffle_handlers), 1)
+        # Net retained memory across 50 full app lifecycles should be negligible (< 1MB)
+        self.assertLess(current_bytes, 1024 * 1024, f"Retained memory grew unexpectedly: {current_bytes} bytes")
+
+    @patch("shuffle_sdk.shuffle_sdk.requests.post")
+    def test_default_logger_none_initialization_and_log_buffer_truncation(self, mock_post):
+        """
+        Verify that initializing AppBase with `logger=None` does not raise AttributeError
+        when attaching the log capture StreamHandler, and properly captures and resets logs.
+        """
+        mock_post.return_value = MagicMock(status_code=200, text="OK")
+        app = SampleIntegrationApp(redis=None, logger=None, console_logger=None)
+        app.logger.warning("Captured log message with default logger")
+        self.assertIn("Captured log message with default logger", app.log_capture_string.getvalue())
+
+        app.send_result({"status": "SUCCESS", "action": {"id": "a1"}}, {"Authorization": "Bearer t"}, "ok")
+        self.assertEqual(app.log_capture_string.getvalue(), "")
+
+    def test_python_311_plus_large_int_str_digits_limit_in_validate_condition(self):
+        """
+        Python 3.11+ enforces CVE-2020-10735 (`sys.set_int_max_str_digits`, default 4300),
+        raising `ValueError` when calling `int()` on >4300 digit strings.
+        Verify `validate_condition` handles >5000 digit strings gracefully without crashing.
+        """
+        huge_number_a = "9" * 5000
+        huge_number_b = "9" * 5000
+        self.assertTrue(self.app.validate_condition(huge_number_a, "==", huge_number_b))
+        self.assertFalse(self.app.validate_condition(huge_number_a, "larger than", huge_number_b))
+
+    @patch("shuffle_sdk.shuffle_sdk.requests.post")
+    def test_large_payload_memory_guards_magic_parser_liquid_and_cloud_30mb(self, mock_post):
+        """
+        Verify built-in memory protection guards:
+        1. `run_magic_parser` skips regex explosion on strings > 100,000 chars and lists > 10,000 items.
+        2. `parse_liquid` skips Liquid rendering on templates > 10,000,000 chars.
+        3. `send_result` replaces payloads >= 30MB on shuffle.io cloud with a safe error payload.
+        """
+        # 1. Magic parser > 100KB string guard
+        large_str = "A" * 100005
+        res_str = self.app.run_magic_parser(large_str)
+        self.assertEqual(len(res_str), 100005)
+
+        # 2. Magic parser > 10,000 comma-separated items loop guard
+        many_csv_items = ",".join(["a"] * 10005)
+        res_csv = self.app.run_magic_parser(many_csv_items)
+        self.assertIsInstance(res_csv, str)
+        self.assertEqual(res_csv, many_csv_items)
+
+        # 3. Liquid > 10MB guard (skips Liquid rendering when template > 10,000,000 chars)
+        huge_template = ("B" * 10_000_005) + '{{ "x" | upcase }}'
+        full_exec = {
+            "execution_id": "exec-10mb-liq",
+            "authorization": "auth-10mb",
+            "workflow": {"id": "wf-10mb", "actions": [], "branches": []},
+            "results": [],
+        }
+        mock_post.side_effect = make_mock_post_for_execution(full_exec)
+        self.app.execute_action({
+            "id": "act-10mb-liq",
+            "name": "echo_value",
+            "parameters": [{"name": "value", "value": huge_template, "variant": "STATIC_VALUE"}],
+        })
+        self.assertTrue(self.app.action_result["result"].endswith('{{ "x" | upcase }}'))
+
+        # 4. Cloud 30MB payload guard in send_result
+        sent_payloads = []
+
+        def capture_post(url, headers=None, json=None, **kwargs):
+            sent_payloads.append(json)
+            return MagicMock(status_code=200, text="OK")
+
+        mock_post.side_effect = capture_post
+        self.app.url = "https://shuffler.io"
+        action_result = {"action": {"id": "act-30mb"}, "status": "SUCCESS", "result": "X" * 30_000_100}
+        self.app.send_result(action_result, {"Authorization": "Bearer test"}, "/api/v1/streams")
+
+        self.assertEqual(len(sent_payloads), 1)
+        returned_body = json.loads(sent_payloads[0]["result"])
+        self.assertFalse(returned_body["success"])
+        self.assertIn("too large", returned_body["reason"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -343,7 +343,15 @@ class AppBase:
             ch = logging.StreamHandler(self.log_capture_string)
             formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
             ch.setFormatter(formatter)
-            logger.addHandler(ch)
+            for existing_handler in list(self.logger.handlers):
+                if getattr(existing_handler, "_shuffle_log_capture", False):
+                    self.logger.removeHandler(existing_handler)
+                    try:
+                        existing_handler.close()
+                    except Exception:
+                        pass
+            ch._shuffle_log_capture = True
+            self.logger.addHandler(ch)
 
         self.redis=redis
         self.console_logger = logger if logger is not None else logging.getLogger("AppBaseLogger")
@@ -875,6 +883,8 @@ class AppBase:
         if not os.getenv("SHUFFLE_LOGS_DISABLED") == "true":
             try:
                 self.log_capture_string.flush()
+                self.log_capture_string.seek(0)
+                self.log_capture_string.truncate(0)
                 #self.log_capture_string.close()
                 #pass
             except Exception as e:
@@ -1181,6 +1191,7 @@ class AppBase:
         #elif len(listitems) == 1:
         elif len(listlengths) == 1:
             #self.logger.info("All subitems are the same length")
+            looped_keys = {k for it in listitems for k in it}
 
             for item in listitems:
                 # This loops should always be length 1
@@ -1190,11 +1201,11 @@ class AppBase:
 
                     if len(paramlist) == value:
                         for subloop in range(value):
-                            baseitem = copy.deepcopy(baseparams)
+                            baseitem = {k: copy.deepcopy(v) for k, v in baseparams.items() if k not in looped_keys} if len(paramlist) != value else None
                             paramlist[subloop][key] = baseparams[key][subloop]
                     else:
                         for subloop in range(value):
-                            baseitem = copy.deepcopy(baseparams)
+                            baseitem = {k: copy.deepcopy(v) for k, v in baseparams.items() if k not in looped_keys} if len(paramlist) != value else None
                             baseitem[key] = baseparams[key][subloop]
                             paramlist.append(baseitem)
                 
@@ -1963,7 +1974,7 @@ class AppBase:
                     if int(sourcevalue) > int(destinationvalue):
                         return True
 
-            except AttributeError as e:
+            except (AttributeError, ValueError) as e:
                 self.logger.info("[WARNING] Condition larger than failed with values %s and %s: %s" % (sourcevalue, destinationvalue, e))
 
             try:
@@ -2001,7 +2012,7 @@ class AppBase:
                     if int(sourcevalue) < int(destinationvalue):
                         return True
 
-            except AttributeError as e:
+            except (AttributeError, ValueError) as e:
                 pass
 
             try:
@@ -4022,12 +4033,18 @@ class AppBase:
                                 # This is a result array for JUST this value.. 
                                 # What if there are more?
                                 resultarray = []
+                                parsed_replacements = {}
+                                for rep_k, rep_v in replacements.items():
+                                    try:
+                                        parsed_replacements[rep_k] = json.loads(rep_v)
+                                    except Exception:
+                                        parsed_replacements[rep_k] = None
                                 for i in range(0, curminlength): 
                                     tmpitem = json.loads(json.dumps(parameter["value"]))
                                     for key, value in replacements.items():
                                         replacement = value
                                         try:
-                                            replacement_item = json.loads(value)[i]
+                                            replacement_item = (parsed_replacements[key] if parsed_replacements.get(key) is not None else json.loads(value))[i]
                                             if isinstance(replacement_item, (dict, list)):
                                                 replacement = json.dumps(replacement_item, ensure_ascii=False)
                                             else:
@@ -4199,7 +4216,7 @@ class AppBase:
                             # The goal is to parse objects that e.g. use single quotes and the like
                             # FIXME: add this to Multi exec as well.
                             try:
-                                for key, value in params.items():
+                                for key, value in list(params.items()):
                                     if "-" in key:
                                         try:
                                             newkey = key.replace("-", "_", -1).lower()
@@ -4210,10 +4227,14 @@ class AppBase:
                                     try:
                                         if isinstance(value, str) and ((value.startswith("{") and value.endswith("}")) or (value.startswith("[") and value.endswith("]"))):
                                             params[key] = json.loads(value)
+                                            if "-" in key:
+                                                params[key.replace("-", "_", -1).lower()] = params[key]
                                     except Exception as e:
                                         try:
                                             if isinstance(value, str) and ((value.startswith("{") and value.endswith("}")) or (value.startswith("[") and value.endswith("]"))):
                                                 params[key] = ast.literal_eval(value)
+                                                if "-" in key:
+                                                    params[key.replace("-", "_", -1).lower()] = params[key]
                                         except Exception as e:
                                             self.logger.info(f"[DEBUG] Failed parsing value with ast and json.loads - noncritical. Trying next: {e}")
                                             continue
@@ -4271,6 +4292,14 @@ class AppBase:
                                         newres = json.dumps({
                                             "success": False,
                                             "reason": "Timeout error (2) within %d seconds (2). This happens if we can't reach or use the API you're trying to use within the time limit. Configure SHUFFLE_APP_SDK_TIMEOUT=100 in Orborus to increase it to 100 seconds. Not changeable for cloud." % timeout,
+                                        })
+                                    finally:
+                                        try:
+                                            executor.shutdown(wait=False)
+                                        except Exception:
+                                            pass
+                                        if False:
+                                            _unused = ({
                                         })
 
                                     break
@@ -4430,6 +4459,14 @@ class AppBase:
                                 results = json.dumps([{
                                     "success": False,
                                     "reason": "Loop Timeout error (2) within %d seconds (2). This happens if we can't reach or use the API you're trying to use within the time limit. Configure SHUFFLE_APP_SDK_TIMEOUT=100 in Orborus to increase it to 100 seconds. Not changeable for cloud." % (timeout),
+                                }])
+                            finally:
+                                try:
+                                    executor.shutdown(wait=False)
+                                except Exception:
+                                    pass
+                                if False:
+                                    _unused = ([{
                                 }])
 
 
